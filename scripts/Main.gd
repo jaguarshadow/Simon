@@ -1875,7 +1875,7 @@ func _on_cash_out_button_pressed() -> void:
 	var total := _cash_out_total()
 	if total <= 0:
 		return
-	var fortissimo_new_best := equipped_modifiers["multiplier"] == "fortissimo" and _mod_level("fortissimo") >= 5 and _current_wave_length() > best_streak_this_run
+	var fortissimo_new_best: bool = equipped_modifiers["multiplier"] == "fortissimo" and _mod_level("fortissimo") >= 5 and _current_wave_length() > best_streak_this_run
 	if fortissimo_new_best:
 		total += FORTISSIMO_FANFARE_BONUS
 	# Captured before the streak resets below - Encore needs the phrase that
