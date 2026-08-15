@@ -240,9 +240,9 @@ const ONBOARDING_STEPS := [
 @onready var modifier_panel: Control = $ModifierPanel
 @onready var modifier_vbox: Control = $ModifierPanel/CenterContainer/VBoxContainer
 @onready var modifier_buttons: Array[Button] = [
-	$ModifierPanel/CenterContainer/VBoxContainer/Option1,
-	$ModifierPanel/CenterContainer/VBoxContainer/Option2,
-	$ModifierPanel/CenterContainer/VBoxContainer/Option3,
+	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option1,
+	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option2,
+	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option3,
 ]
 @onready var settings_button: Button = $SettingsButton
 @onready var settings_panel: Control = $SettingsPanel
@@ -869,43 +869,61 @@ func _show_toast(text: String) -> void:
 	t.tween_callback(label.queue_free)
 
 # Persistent build-at-a-glance HUD: one chip per category slot (empty
-# outline if unequipped, icon + level if equipped) plus a Peek button that
-# only appears while Echo Chamber is equipped and has charges. Built purely
-# from code - same pattern as the score popups/toasts above - so no
-# scene-file changes were needed for the whole slot system's UI.
+# outline if unequipped, icon/title/level if equipped, full description on
+# hover via tooltip_text) plus a Peek button that only appears while Echo
+# Chamber is equipped and has charges. Built purely from code - same
+# pattern as the score popups/toasts above - so no scene-file changes were
+# needed for the whole slot system's UI. Stacked vertically on the left
+# edge (x=14, below the top HUD row, left of the pad ring) so it never
+# overlaps ModeBar/RoundLabel/ComboLabel or the pads themselves.
 func _build_loadout_hud() -> void:
-	loadout_hud = HBoxContainer.new()
-	loadout_hud.add_theme_constant_override("separation", 8)
+	loadout_hud = VBoxContainer.new()
+	loadout_hud.add_theme_constant_override("separation", 6)
 	loadout_hud.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	loadout_hud.position = Vector2(18, 18)
-	loadout_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loadout_hud.position = Vector2(12, 156)
 	add_child(loadout_hud)
 	for cat in MODIFIER_CATEGORIES:
 		var chip := PanelContainer.new()
-		chip.custom_minimum_size = Vector2(96, 30)
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.custom_minimum_size = Vector2(128, 44)
+		# STOP (not IGNORE) so the chip actually receives hover events -
+		# that's what makes tooltip_text work at all.
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
 		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(1, 1, 1, 0.06)
+		sb.bg_color = Color(0.05, 0.05, 0.06, 0.75)
 		sb.border_color = Color(1, 1, 1, 0.25)
 		sb.set_border_width_all(1)
 		sb.set_corner_radius_all(6)
 		sb.content_margin_left = 8
 		sb.content_margin_right = 8
-		sb.content_margin_top = 3
-		sb.content_margin_bottom = 3
+		sb.content_margin_top = 4
+		sb.content_margin_bottom = 4
 		chip.add_theme_stylebox_override("panel", sb)
+		var vbox := VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 1)
+		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(vbox)
+		var cat_lbl := Label.new()
+		cat_lbl.text = CATEGORY_LABELS[cat].to_upper()
+		cat_lbl.add_theme_font_size_override("font_size", 9)
+		cat_lbl.modulate.a = 0.6
+		cat_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(cat_lbl)
 		var lbl := Label.new()
-		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.add_theme_font_size_override("font_size", 13)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		lbl.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		lbl.clip_contents = true
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.add_child(lbl)
+		vbox.add_child(lbl)
 		loadout_hud.add_child(chip)
 		loadout_slot_panels[cat] = chip
 		loadout_slot_labels[cat] = lbl
 	peek_button = Button.new()
 	peek_button.text = "Peek"
+	peek_button.custom_minimum_size = Vector2(128, 0)
 	peek_button.visible = false
 	peek_button.focus_mode = Control.FOCUS_NONE
+	peek_button.tooltip_text = "Echo Chamber: preview upcoming notes before you attempt them."
 	peek_button.pressed.connect(_use_echo_chamber_peek)
 	peek_button.pressed.connect(Sound.play_ui_tick.bind(660.0, 0.22))
 	loadout_hud.add_child(peek_button)
@@ -921,17 +939,21 @@ func _refresh_loadout_hud() -> void:
 		var chip: PanelContainer = loadout_slot_panels[cat]
 		var sb: StyleBoxFlat = chip.get_theme_stylebox("panel")
 		if id == "":
-			lbl.text = "%s: —" % CATEGORY_LABELS[cat].left(1)
-			sb.border_color = Color(1, 1, 1, 0.25)
+			lbl.text = "— empty —"
+			lbl.modulate.a = 0.5
+			sb.border_color = Color(1, 1, 1, 0.2)
+			chip.tooltip_text = "%s slot: no modifier equipped yet." % CATEGORY_LABELS[cat]
 		else:
 			var mod := _mod_def(id)
 			var suffix := ""
 			if id == "safety_net" or id == "second_wind":
-				suffix = " (%d)" % int(modifier_resource.get(id, 0))
+				suffix = "  (%d left)" % int(modifier_resource.get(id, 0))
 			elif id == "unbreakable":
-				suffix = " (%d/%d)" % [_mod_level(id) - unbreakable_forgiven_this_streak, _mod_level(id)]
-			lbl.text = "%s Lv.%d%s" % [mod["icon"], _mod_level(id), suffix]
+				suffix = "  (%d/%d)" % [_mod_level(id) - unbreakable_forgiven_this_streak, _mod_level(id)]
+			lbl.text = "%s %s Lv.%d" % [mod["icon"], mod["title"], _mod_level(id)]
+			lbl.modulate.a = 1.0
 			sb.border_color = Color(1, 0.85, 0.3, 0.9)
+			chip.tooltip_text = "%s (Lv.%d/%d)%s\n%s" % [mod["title"], _mod_level(id), MAX_MODIFIER_LEVEL, suffix, mod["desc"]]
 	if equipped_modifiers["defense"] == "echo_chamber":
 		var charges := int(modifier_resource.get("echo_chamber", 0))
 		peek_button.visible = true
@@ -2574,6 +2596,111 @@ func _hint_note_count() -> int:
 
 # --- Draft flow ---
 
+# Builds one draft card's full content from scratch (cleared and rebuilt
+# every offer, same "rebuild rather than diff" approach as the rest of the
+# UI in this file). Same structural pattern as _build_scale_cards() - a
+# Button with MarginContainer/VBoxContainer children carrying the real
+# content, mouse_filter IGNORE throughout so clicks still land on the button.
+func _build_modifier_card(button: Button, mod: Dictionary) -> void:
+	for child in button.get_children():
+		child.queue_free()
+	button.text = ""
+	var id: String = mod["id"]
+	var cat: String = mod["category"]
+	var cur_level := _mod_level(id)
+	var incumbent: String = equipped_modifiers[cat]
+	var status_text: String
+	var status_color: Color
+	if incumbent == id:
+		status_text = "▲ LEVEL UP  Lv.%d → Lv.%d" % [cur_level, cur_level + 1]
+		status_color = Color(0.45, 0.85, 0.55)
+	elif incumbent != "":
+		var incumbent_title: String = String(_mod_def(incumbent).get("title", incumbent))
+		status_text = "⇄ REPLACES %s" % incumbent_title
+		status_color = Color(1.0, 0.62, 0.28)
+	else:
+		status_text = "+ NEW PICK"
+		status_color = Color(0.45, 0.7, 1.0)
+	if cur_level > 0 and incumbent != id:
+		status_text += "  (resumes at Lv.%d)" % cur_level
+
+	var card_sb := StyleBoxFlat.new()
+	card_sb.bg_color = Color(status_color, 0.08)
+	card_sb.border_color = status_color
+	card_sb.set_border_width_all(2)
+	card_sb.set_corner_radius_all(10)
+	card_sb.content_margin_left = 14
+	card_sb.content_margin_right = 14
+	card_sb.content_margin_top = 12
+	card_sb.content_margin_bottom = 12
+	button.add_theme_stylebox_override("normal", card_sb)
+	var hover_sb: StyleBoxFlat = card_sb.duplicate()
+	hover_sb.bg_color = Color(status_color, 0.16)
+	button.add_theme_stylebox_override("hover", hover_sb)
+
+	var margin := MarginContainer.new()
+	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	button.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.add_child(vbox)
+
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(header)
+	var icon_label := Label.new()
+	icon_label.text = mod["icon"]
+	icon_label.add_theme_font_size_override("font_size", 22)
+	icon_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(icon_label)
+	var title_label := Label.new()
+	title_label.text = mod["title"]
+	title_label.add_theme_font_size_override("font_size", 16)
+	title_label.autowrap_mode = 2
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(title_label)
+
+	var cat_label := Label.new()
+	cat_label.text = "%s%s" % [CATEGORY_LABELS[cat].to_upper(), "  ·  POWER" if mod["power"] else ""]
+	cat_label.add_theme_font_size_override("font_size", 10)
+	cat_label.modulate.a = 0.65
+	cat_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(cat_label)
+
+	var status_badge := PanelContainer.new()
+	status_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var badge_sb := StyleBoxFlat.new()
+	badge_sb.bg_color = status_color
+	badge_sb.set_corner_radius_all(5)
+	badge_sb.content_margin_left = 8
+	badge_sb.content_margin_right = 8
+	badge_sb.content_margin_top = 3
+	badge_sb.content_margin_bottom = 3
+	status_badge.add_theme_stylebox_override("panel", badge_sb)
+	var status_label := Label.new()
+	status_label.text = status_text
+	status_label.add_theme_font_size_override("font_size", 11)
+	status_label.add_theme_color_override("font_color", Color.BLACK)
+	status_label.autowrap_mode = 2
+	status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_badge.add_child(status_label)
+	vbox.add_child(status_badge)
+
+	var desc_label := Label.new()
+	desc_label.text = mod["desc"]
+	desc_label.add_theme_font_size_override("font_size", 12)
+	desc_label.autowrap_mode = 2
+	desc_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	desc_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	desc_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(desc_label)
+	button.disabled = false
+
 func _offer_modifier_choice() -> void:
 	var pool: Array = []
 	for mod in MODIFIERS:
@@ -2589,21 +2716,7 @@ func _offer_modifier_choice() -> void:
 			modifier_buttons[i].visible = false
 			continue
 		modifier_buttons[i].visible = true
-		var mod: Dictionary = current_offer[i]
-		var id: String = mod["id"]
-		var cat: String = mod["category"]
-		var cur_level := _mod_level(id)
-		var status: String
-		if equipped_modifiers[cat] == id:
-			status = "Level Up -> Lv.%d" % (cur_level + 1)
-		elif cur_level > 0:
-			status = "Re-equip (Lv.%d) - swaps %s" % [cur_level, CATEGORY_LABELS[cat]]
-		elif equipped_modifiers[cat] != "":
-			status = "New - swaps %s" % CATEGORY_LABELS[cat]
-		else:
-			status = "New Pick"
-		var power_tag := "  [POWER]" if mod["power"] else ""
-		modifier_buttons[i].text = "%s %s%s  (%s)\n%s" % [mod["icon"], mod["title"], power_tag, status, mod["desc"]]
+		_build_modifier_card(modifier_buttons[i], current_offer[i])
 	await _reveal_modifier_panel()
 	var chosen_id: String = await _modifier_picked
 	modifier_panel.visible = false
