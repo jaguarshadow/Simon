@@ -2717,9 +2717,15 @@ func _offer_modifier_choice() -> void:
 			continue
 		modifier_buttons[i].visible = true
 		_build_modifier_card(modifier_buttons[i], current_offer[i])
+	# The loadout HUD is a persistent overlay added after ModifierPanel in
+	# the tree, so it draws on top of - and overlaps - the draft cards
+	# unless explicitly hidden while the panel is open.
+	if loadout_hud != null:
+		loadout_hud.visible = false
 	await _reveal_modifier_panel()
 	var chosen_id: String = await _modifier_picked
 	modifier_panel.visible = false
+	_refresh_loadout_hud()
 	await _resolve_modifier_pick(chosen_id)
 
 # Dramatic reveal for the modifier choice - it's a meaningful decision point,
