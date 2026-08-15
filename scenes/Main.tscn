@@ -1,0 +1,770 @@
+[gd_scene format=3 uid="uid://bqxg8m2j2f6t0"]
+
+[ext_resource type="Script" uid="uid://cjnqqgyce3ihb" path="res://scripts/Main.gd" id="1_main"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_resonator"]
+bg_color = Color(0.35, 0.37, 0.4, 1)
+corner_radius_top_left = 80
+corner_radius_top_right = 80
+corner_radius_bottom_right = 80
+corner_radius_bottom_left = 80
+shadow_color = Color(0, 0, 0, 0.35)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_settingsbg"]
+bg_color = Color(0.07, 0.07, 0.09, 0.98)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.08)
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 12
+
+[node name="Main" type="Control" unique_id=1623531381]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1669769129]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.05, 0.07, 1)
+
+[node name="Resonator" type="Panel" parent="." unique_id=1322543065]
+layout_mode = 0
+offset_left = 320.0
+offset_top = 320.0
+offset_right = 480.0
+offset_bottom = 480.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_resonator")
+
+[node name="PadRing" type="Control" parent="." unique_id=1090960670]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="RoundLabel" type="Label" parent="." unique_id=922145855]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_top = 24.0
+offset_right = 100.0
+offset_bottom = 56.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 24
+text = "Round: 0"
+horizontal_alignment = 1
+
+[node name="ComboLabel" type="Label" parent="." unique_id=1348174472]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -120.0
+offset_top = 108.0
+offset_right = 120.0
+offset_bottom = 144.0
+grow_horizontal = 2
+pivot_offset = Vector2(120, 18)
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+
+[node name="ScoreLabel" type="Label" parent="." unique_id=300619056]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 24.0
+offset_right = -20.0
+offset_bottom = 56.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 24
+text = "Score: 0"
+horizontal_alignment = 2
+
+[node name="CashOutButton" type="Button" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -260.0
+offset_top = 112.0
+offset_right = -20.0
+offset_bottom = 148.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 18
+text = "Cash Out"
+
+[node name="ModeBar" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 64.0
+offset_right = 300.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="StartButton" type="Button" parent="ModeBar" unique_id=1114559383]
+layout_mode = 2
+text = "Normal Mode"
+
+[node name="ChaosButton" type="Button" parent="ModeBar" unique_id=847213655]
+layout_mode = 2
+text = "Chaos Mode"
+
+[node name="ZenButton" type="Button" parent="ModeBar" unique_id=335780669]
+layout_mode = 2
+text = "Zen Mode"
+
+[node name="MusicButton" type="Button" parent="ModeBar" unique_id=335780670]
+layout_mode = 2
+text = "Music Mode"
+
+[node name="DuetButton" type="Button" parent="ModeBar" unique_id=335780671]
+layout_mode = 2
+text = "Duet Mode"
+
+[node name="ZenBar" type="Control" parent="." unique_id=578271270]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 24.0
+offset_right = 160.0
+offset_bottom = 100.0
+grow_horizontal = 2
+
+[node name="ZenLabel" type="Label" parent="ZenBar" unique_id=1600425499]
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 22
+text = "Zen Mode - play freely"
+horizontal_alignment = 1
+
+[node name="ExitZenButton" type="Button" parent="ZenBar" unique_id=1179867679]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 40.0
+offset_right = 220.0
+offset_bottom = 76.0
+text = "Exit Zen"
+
+[node name="MusicBar" type="Control" parent="." unique_id=578271271]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 24.0
+offset_right = 160.0
+offset_bottom = 100.0
+grow_horizontal = 2
+
+[node name="MusicLabel" type="Label" parent="MusicBar" unique_id=1600425500]
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 22
+text = "Music Mode - listen"
+horizontal_alignment = 1
+
+[node name="ExitMusicButton" type="Button" parent="MusicBar" unique_id=1179867680]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 40.0
+offset_right = 220.0
+offset_bottom = 76.0
+text = "Exit Music"
+
+[node name="SettingsButton" type="Button" parent="." unique_id=2112373000]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -140.0
+offset_top = -56.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "Settings"
+
+[node name="HelpButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -56.0
+offset_right = 56.0
+offset_bottom = -20.0
+grow_vertical = 0
+text = "?"
+
+[node name="FlashOverlay" type="ColorRect" parent="." unique_id=1498060507]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 0.1, 0.1, 0)
+
+[node name="ModifierPanel" type="Control" parent="." unique_id=1747728247]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="ModifierPanel" unique_id=1387149337]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="CenterContainer" type="CenterContainer" parent="ModifierPanel" unique_id=368814505]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="ModifierPanel/CenterContainer" unique_id=265766565]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="ModifierPanel/CenterContainer/VBoxContainer" unique_id=422076279]
+layout_mode = 2
+theme_override_font_sizes/font_size = 26
+text = "Choose a Modifier"
+horizontal_alignment = 1
+
+[node name="Option1" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer" unique_id=2018001135]
+custom_minimum_size = Vector2(380, 64)
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="Option2" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer" unique_id=340764271]
+custom_minimum_size = Vector2(380, 64)
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="Option3" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer" unique_id=1242946524]
+custom_minimum_size = Vector2(380, 64)
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="SettingsPanel" type="Control" parent="." unique_id=456314169]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="SettingsPanel" unique_id=2087689846]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.82)
+
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel" unique_id=898021341]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ContentBox" type="VBoxContainer" parent="SettingsPanel/CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox" unique_id=745616921]
+custom_minimum_size = Vector2(680, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleBlock" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 19
+text = "SIMON"
+
+[node name="SubtitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 11
+text = "Steel Tongue Drum Edition · Settings"
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="HeaderSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="ScoreTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "BEST SCORE"
+horizontal_alignment = 2
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="ValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0"
+horizontal_alignment = 2
+
+[node name="RoundTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "BEST ROUND"
+horizontal_alignment = 2
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="ValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0"
+horizontal_alignment = 2
+
+[node name="ComboTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+alignment = 1
+
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 10
+text = "BEST COMBO"
+horizontal_alignment = 2
+modulate = Color(1, 1, 1, 0.6)
+
+[node name="ValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "0"
+horizontal_alignment = 2
+
+[node name="CloseXButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+custom_minimum_size = Vector2(32, 32)
+layout_mode = 2
+size_flags_vertical = 4
+text = "×"
+
+[node name="PanelBG" type="PanelContainer" parent="SettingsPanel/CenterContainer/ContentBox"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_settingsbg")
+
+[node name="TabContainer" type="TabContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG"]
+custom_minimum_size = Vector2(680, 380)
+layout_mode = 2
+
+[node name="Scales" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="ScaleGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales/Margin"]
+layout_mode = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="Themes" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="ThemeCenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer"]
+layout_mode = 2
+
+[node name="ThemeGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/ThemeCenterContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 3
+
+[node name="PaletteSection" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PaletteSectionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Premium & Minimal pairs with any pad palette - pick one:"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="PaletteGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 1
+
+[node name="Audio" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MasterRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Master"
+
+[node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="PctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "100%"
+horizontal_alignment = 2
+
+[node name="TonesRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "Tones"
+
+[node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 0.9
+
+[node name="PctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "90%"
+horizontal_alignment = 2
+
+[node name="UIRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "UI"
+
+[node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="Accessibility" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+visible = false
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin"]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ReduceMotionCheck" type="CheckBox" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Reduce screen shake & flash"
+
+[node name="DescriptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Softens the camera shake and color flash on hits, misses, and forgiveness so they're less intense - useful if fast motion or flashing is uncomfortable."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ButtonRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox" unique_id=1169181349]
+custom_minimum_size = Vector2(680, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ResetButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow" unique_id=1892623080]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 2
+text = "Reset Progress"
+
+[node name="ConfirmRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ConfirmLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Reset all progress? This can't be undone."
+vertical_alignment = 1
+
+[node name="ConfirmYesButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "Confirm Reset"
+
+[node name="ConfirmNoButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+custom_minimum_size = Vector2(90, 40)
+layout_mode = 2
+text = "Cancel"
+
+[node name="ButtonSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow" unique_id=756659686]
+custom_minimum_size = Vector2(120, 44)
+layout_mode = 2
+text = "Close"
+
+[node name="OnboardingPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="OnboardingPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+
+[node name="CenterContainer" type="CenterContainer" parent="OnboardingPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="OnboardingPanel/CenterContainer"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="StepIndicatorLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 14
+text = "Step 1 / 4"
+horizontal_alignment = 1
+
+[node name="TitleLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Title"
+horizontal_alignment = 1
+
+[node name="BodyLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Body"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ButtonRow" type="HBoxContainer" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="SkipButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow"]
+custom_minimum_size = Vector2(100, 44)
+layout_mode = 2
+text = "Skip"
+
+[node name="NextButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow"]
+custom_minimum_size = Vector2(140, 44)
+layout_mode = 2
+text = "Next"
+
+[node name="GameOverPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="GameOverPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.65)
+
+[node name="CenterContainer" type="CenterContainer" parent="GameOverPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameOverPanel/CenterContainer"]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Game Over"
+horizontal_alignment = 1
+
+[node name="StatsLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Score: 0   Round: 0   Combo: 0"
+horizontal_alignment = 1
+
+[node name="BestLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 16
+text = ""
+horizontal_alignment = 1
+
+[node name="CloseButton" type="Button" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(140, 44)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Continue"

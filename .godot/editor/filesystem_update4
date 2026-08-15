@@ -1,0 +1,4 @@
+res://scripts/Main.gd
+res://scripts/sound.gd
+res://scripts/simon_button.gd
+res://shaders/flat_shimmer.gdshader
