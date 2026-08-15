@@ -1,11 +1,15 @@
-# Modifier Expansion — Design Proposal
+# Modifier Expansion — Shipped
 
-Design proposal for the modifier roster feeding the "Scoring escalation" work in `TODO.md`. Not
-yet implemented — current, shipped modifier behavior (simple additive/multiplicative stacking, no
-levels, no slots) is documented in `docs/scoring-and-modifiers.md`. This doc assumes the shipped
-cash-out economy (`docs/scoring-escalation.md`) is in place and adds two things on top of it: the
-four-category slot system, and — new in this pass — a **1-5 leveling curve for every modifier**,
-replacing the earlier "just stacks forever" model this doc originally proposed.
+**Implemented.** Everything below (the four-category slot system, all 24 modifiers, 1→5 leveling)
+is live in `Main.gd` as of this pass — see `docs/scoring-and-modifiers.md` for the shipped
+mechanics summary and `TODO.md` for the checklist entry. This doc is kept as the design record;
+where implementation required a concrete call the design text left open, an **Implementation
+note** is added inline at that entry rather than silently changing the text above it.
+
+Original framing, left as-is below since it's still an accurate account of *why* each piece looks
+the way it does: design proposal for the modifier roster feeding the "Scoring escalation" work in
+`TODO.md`, written against the shipped cash-out economy (`docs/scoring-escalation.md`), adding the
+four-category slot system and a **1-5 leveling curve for every modifier** on top of it.
 
 **Revision history:** an earlier pass rejected the wave-cap mechanic this doc was first written
 against (sequence length climbing toward a forced-reset cap) in favor of the shipped
@@ -94,6 +98,16 @@ modifiers equally.
 - **Harmonic Chain** and **Motif Bonus** depend on the (not-yet-implemented) musical-chunking
   generator being shared across Normal/Chaos's sequences *and* Duet's call-phrases, not
   Normal/Chaos-only.
+  **Implementation note:** shipped as a lightweight, scoped-down chunking system
+  (`_tag_chunk_for_new_note()`/`_completed_repeated_chunk()` in `Main.gd`, `TODO.md`'s musical-
+  chunking bullet) - every 3-note (`CHUNK_SIZE`) group has a 35% (`CHUNK_REPEAT_CHANCE`) chance of
+  reusing an earlier chunk's id instead of getting a fresh one, applied identically to Normal/
+  Chaos's cumulative sequence and Duet's per-round phrase (both call the same tagging function per
+  note appended). This is deliberately the minimum needed to give Harmonic Chain/Motif Bonus a
+  real "was this note part of a repeated motif" signal, not the fuller "canonical riff library"
+  version `TODO.md` originally envisioned for musical chunking generally - the visual repeat cue
+  that TODO also asked for is still an open follow-up, now cheap to add since the underlying
+  per-note chunk id already exists.
 
 ## The restated design invariant (cap is gone; this is what replaced it)
 
@@ -142,9 +156,14 @@ where Resonance's bonus wasn't reaching it).
 4. **Perfect Pitch** *(new)* — bonus multiplier for a steady tapping cadence (low variance between
    your own consecutive hit intervals during a repeat-back), measured identically in Normal/Chaos/
    Duet. Levels scale the bonus magnitude: **+5% / +8% / +12% / +16% / +20%** when cadence is
-   steady. No L5 twist — the "cadence consistency" measurement itself still needs a real formula
+   steady. No L5 twist - the "cadence consistency" measurement itself still needs a real formula
    (window size, variance-to-bonus mapping) before implementation, flagged in Open Items; adding a
    mastery gimmick on top of an unspecified base mechanic would be premature.
+   **Implementation note:** shipped with a concrete formula (`_perfect_pitch_multiplier()` in
+   `Main.gd`) - a rolling window of the last `PERFECT_PITCH_WINDOW` (4) inter-hit intervals; the
+   bonus applies whenever that window's standard deviation is at or under
+   `PERFECT_PITCH_STDEV_THRESHOLD_MS` (90ms). Both constants are by-eye placeholders, same status
+   as every other untested numeric constant in this doc - needs a real playtesting pass to tune.
 5. **Harmonic Chain** *(new)* — stacking bonus for consecutive hits within the same musical chunk/
    motif (depends on the chunking generator, `TODO.md`). Levels scale the per-hit stack increment:
    **+2% / +3% / +4% / +5% / +6%** per consecutive in-motif hit. **L5 twist:** the stack no longer
@@ -225,6 +244,13 @@ just for a slightly different reason than when it was written.
    ends the streak; Muffled Strike is unlimited-but-unreliable and, on a normal (non-L5) success,
    keeps the streak running exactly where it was, like an extra Safety Net charge that only exists
    when you'd otherwise be out of them.
+   **Implementation note:** the shipped forgiveness path (`_resolve_defense_on_miss()`,
+   `docs/scoring-and-modifiers.md`) already leaves the unbanked pool untouched on *every* forgiven
+   outcome unconditionally, not just at L5 — that was true before Muffled Strike existed and stays
+   true for it at every level. The "L5 also protects points" line above doesn't get special-case
+   code as a result; it's accurate as a description of what happens, just not as a *contrast* to
+   L1-4 (which already behave the same way on that specific point). Left as-written above rather
+   than edited, since it's a harmless overstatement rather than a wrong one.
 4. **Grounding Resonance** *(new)* — slows any mode's *intra-streak* per-round escalation rate
    (Chaos's speed/reshuffle ramp, Duet's tempo ramp) by a flat percentage; Normal has no ramp to
    slow, so it's naturally low-value there, same pattern as Slow Fade in Chaos. Explicitly scoped

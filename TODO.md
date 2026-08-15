@@ -145,33 +145,34 @@ remaining three bullets build on the mechanic as it actually shipped, not the do
       (rewritten to match) — the original forced-cap design is preserved there under "Rejected: the
       forced wave-cap design" since `docs/modifier-expansion.md` still designs a couple of
       not-yet-built modifiers against it (flagged there, not fixed, since they're unimplemented).
-- [ ] Modifier slot system, Hades-style: modifiers are grouped into categories, one equipped
-      modifier per category at a time (not unlimited stacking, not a flat N-of-many cap) — forces
-      real tradeoffs at every pick and gives builds legible identity. Four categories, mapped onto
-      the 5 existing modifiers:
-        - **Multiplier** — Sharper Ear, Resonance (shared slot for now; split into two categories
-          later if this gets crowded)
-        - **Defense** — Safety Net (currently the only member — needs 1-2 new sibling modifiers
-          before this category has a real choice in it, flag as open item)
-        - **Tempo** — Steady Hands
-        - **Bonus-Event** — Golden Step
-      Categorizing by *effect type* (not risk/reward stance) was the deliberate choice — players
-      need to read "I have a Defense slot open" at a glance during the paused, still-tense
-      every-3rd-round pick moment, which an abstract risk-posture label doesn't support as well.
-- [ ] Modifier roster expansion + synergies: grow from 5 to 24 modifiers (6 per category,
-      including 1 milestone-gated "power" modifier per category), so cross-category builds
-      (one modifier per category) create combinatorial synergy instead of same-category additive
-      stacking. Full roster, per-modifier rationale, milestone unlock table, and 4 example builds
-      ("Marathon Runner", "Precision Virtuoso", "Chunk Master", "All-In Gambler") written up in
-      `docs/modifier-expansion.md`, including the opinion on why 24 (not Balatro's ~150) is the
-      right v1 pool size for a shorter-run, calmer-toned game. Most of the roster is unaffected by
-      the wave-reset bullet's cap removal above, but **Fortissimo and Grand Finale (the Multiplier
-      and Bonus-Event power modifiers) and Second Wind (Defense) are flagged stale** in that doc —
-      all three were specified against the rejected forced-cap mechanic and need a redesign pass
-      before implementation, not a direct port.
-- [ ] Musical chunking in sequence generation: build longer sequences out of reused, recognizable
-      motifs/riffs (reuses Music Mode's generators — phrase repetition, resolving to tonic) instead
-      of pure random note strings, so players can track longer sequences than raw digit-span would
-      allow by recognizing structure. Surfaced to the player via a **very subtle** visual cue when
-      a phrase repeats — subtlety is a deliberate constraint, not a placeholder; this should read
-      as an ear/pattern-recognition aid, not an explicit "here's the repeated bit" callout.
+- [x] Modifier slot system, Hades-style: modifiers are grouped into four categories (Multiplier,
+      Defense, Tempo, Bonus-Event), one equipped modifier per category at a time. Picking a
+      *different* modifier into a filled slot prompts a real swap-or-skip confirmation dialog;
+      picking the modifier already equipped in its slot levels it up (1→5, capped) instead.
+      Implemented in `Main.gd`: `equipped_modifiers`/`modifier_levels`/`modifier_resource` hold
+      state, `_resolve_modifier_pick`/`_apply_modifier_pick`/`_show_swap_or_skip_dialog` drive the
+      draft flow, `_recompute_pure_modifier_stats` derives non-consumable stats fresh from
+      equip/level state, and a runtime-built Loadout HUD (`_build_loadout_hud`, top-left, no
+      `.tscn` changes needed) shows the current build at a glance with live charge/level counts.
+- [x] Modifier roster expansion + synergies: all 24 modifiers (6 per category, including 1
+      milestone-gated "power" modifier per category) implemented per the full roster/leveling
+      curves in `docs/modifier-expansion.md`, including the four redesigned entries (Fortissimo,
+      Second Wind, Grand Finale, Echo Chamber). Milestone gates for the power modifiers persist
+      across runs (`best_waves`, `zero_miss_wave_achieved`, `five_cashouts_achieved` in the save
+      file) and surface as unlock toasts on the run-summary screen, same as Scale/Palette/Theme
+      unlocks. See `docs/modifier-expansion.md` for the per-modifier implementation notes and the
+      handful of judgment calls made where the design doc left specifics open (Perfect Pitch's
+      cadence formula, Muffled Strike's L5 "protects points" wording, chunk-repeat heuristics).
+- [x] Musical chunking in sequence generation: implemented as a lightweight version scoped
+      specifically to give Harmonic Chain/Motif Bonus a real signal, not the full "canonical riff
+      library" version originally envisioned here. Every `CHUNK_SIZE`-note (3) group of a growing
+      sequence/phrase has a `CHUNK_REPEAT_CHANCE` (35%) chance of reusing an earlier chunk's id
+      instead of a fresh one (`_tag_chunk_for_new_note` in `Main.gd`), applied uniformly to
+      Normal/Chaos's cumulative sequence and Duet's per-round phrase. No visual "repeated motif"
+      cue was added yet (the original ask here) — flagged below as a smaller follow-up, since it's
+      now genuinely low-cost to add on top of the id-tagging that already exists.
+- [ ] Follow-up: a very subtle visual cue when a chunk repeats (the motif-highlighting idea this
+      TODO item originally asked for) — the underlying signal (`sequence_chunk_id`,
+      `_completed_repeated_chunk`) now exists from the chunking work above; this is just the
+      presentation layer on top, intentionally deferred to keep it genuinely subtle rather than
+      rushed.

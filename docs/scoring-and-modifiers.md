@@ -48,40 +48,54 @@ worth 3x. It re-rolls fresh positions every round rather than fixing them once, 
 stays a per-round tension point ("which of *this* round's steps is gold?") instead of becoming
 predictable after round 1.
 
-## Modifiers: every-3rd-round, stacking, permanent for the run
+## Modifiers: slot system, 24-strong roster, 1→5 leveling
 
-Every `MODIFIER_ROUND_INTERVAL` (3) rounds, `_offer_modifier_choice()` presents 3 random
-modifiers (from a pool of 5) and blocks on a signal (`_modifier_picked`) until the player taps
-one. Chosen modifiers apply immediately and **persist for the rest of the run** — they're not
-per-round buffs. `modifier_stacks` tracks how many times each has been picked, and several
-modifiers are explicitly designed to compound rather than cap at 1:
+**Superseded the free-stacking 5-modifier pool described in earlier revisions of this doc.** Full
+roster, per-modifier rationale, and leveling curves: `docs/modifier-expansion.md`. Short version of
+what's actually live in `Main.gd`:
 
-- **Sharper Ear** — `combo_growth += 0.05` each pick (additive, stacks cleanly)
-- **Safety Net** — `mistake_charges += 1` each pick (literally a charge counter)
-- **Steady Hands** — `sequence_speed_multiplier *= 1.15` (multiplicative — 3 picks is a real
-  slowdown, not a diminishing one)
+Every `MODIFIER_ROUND_INTERVAL` (3) rounds, `_offer_modifier_choice()` presents 3 random modifiers
+drawn from all 24 (power modifiers only appear once their milestone is met; anything already at
+level 5 stops appearing) and blocks on a signal (`_modifier_picked`) until the player taps one.
+Modifiers are grouped into four categories (Multiplier, Defense, Tempo, Bonus-Event) with **one
+equipped modifier per category at a time** (`equipped_modifiers`):
 
-This stacking is why `GAME_DESIGN.md` §3.2 calls out that modifier cards need a visible stacking
-indicator — the mechanic already lets you stack, so the UI needs to say so, or repeat picks look
-like duplicates/mistakes rather than intentional reinforcement.
+- Picking the modifier **already equipped** in its category's slot levels it up (1→5, capped) —
+  `_apply_modifier_pick`.
+- Picking a **different** modifier into a filled slot pauses on a real swap-or-skip confirmation
+  (`_show_swap_or_skip_dialog`, built at runtime, no `.tscn` changes) rather than silently
+  replacing or stacking.
+- Swapping a modifier out doesn't reset its level/charges — they go dormant, not lost, so
+  re-drafting it later in the same run resumes where it left off.
+
+Non-consumable per-level stats (combo-growth bonus, score-bonus percent, golden step count,
+playback-speed multiplier, etc.) are recomputed fresh from equip/level state on every change via
+`_recompute_pure_modifier_stats()`. Consumable resources (Safety Net/Echo Chamber charges, Second
+Wind uses) are granted incrementally on level-up instead (`_grant_resource_on_levelup`) so already
+spent charges never come back from a recompute. A runtime-built Loadout HUD (`_build_loadout_hud`,
+top-left corner) shows all four slots' current icon/level plus live charge counts at a glance.
 
 ## Mistake forgiveness
 
-A wrong pad press only ends the run if `mistake_charges <= 0`. Otherwise a charge is consumed
-(see the `else` branch of `_on_pad_pressed`), `combo` is halved (not zeroed - a genuine but
-softened cost, not "nothing happened"), and the correct pad is flashed once (`_flash_miss_hint`)
-before input returns to the player - a blind retry only helps when the miss was a fumble, not a
-forgotten note, so the hint is what makes the forgiveness actually usable rather than just
-theoretical. This is the mechanism that makes Safety Net stacking meaningful: multiple charges
-silently absorb multiple future mistakes across the rest of the run, in the order they happen,
-each one costing half your current combo rather than the whole thing.
+A wrong pad press routes through `_resolve_defense_on_miss()`, which checks whichever single
+Defense modifier is currently equipped (only one can be, per the slot system above) and returns
+one of three outcomes: `"forgiven_hint"` (Safety Net charges, Unbreakable's per-streak free misses,
+or a lucky Muffled Strike roll), `"forced_cashout"` (Second Wind converts this specific miss into
+an early cash-out instead of ending the run), or `"game_over"` (no Defense modifier equipped, or
+its resource is exhausted). `combo` is halved (not zeroed) on any forgiven outcome, and the
+correct pad is flashed once (`_flash_miss_hint`, showing further-ahead notes too at Safety Net
+L5) before input returns to the player — a blind retry only helps when the miss was a fumble, not
+a forgotten note, so the hint is what makes the forgiveness actually usable rather than just
+theoretical. Double Down's flagged gamble step and Grand Finale's Double-or-Nothing note are
+deliberately routed *around* this function entirely — their misses are self-contained wagers, not
+normal sequence misses, and never consume a Defense resource.
 
-**Forgiveness now protects points, not just the run.** Since cash-out (above) introduced a real
+**Forgiveness protects points, not just the run.** Since cash-out (above) introduced a real
 at-risk pool (`unbanked_points`), a direct design call was made: *"protection from misses should
 also provide protection for points, otherwise what's the point?"* The forgiveness branch never
-touched score before `unbanked_points` existed, and it still doesn't — so a forgiven miss leaves
-the entire current streak's unbanked value untouched, with no extra code needed to make that true.
-Only a true run-ending miss (no charges left) forfeits it, and only because it was never in `score`
-to begin with — `_game_over`'s `final_score` reads `score` (banked-only). Safety Net and its future
-Defense-category siblings (`modifier-expansion.md`) are meaningfully more valuable under this
-mechanic than they were when score was never at risk from any miss.
+touches score — so any `"forgiven_hint"` outcome leaves the entire current streak's unbanked value
+untouched, with no extra code needed to make that true (this is also why Muffled Strike's
+documented "L5 also protects points" doesn't need special-case code — it was already universally
+true of every forgiven outcome; see `docs/modifier-expansion.md`'s implementation note on that
+entry). Only a true `"game_over"` outcome forfeits the unbanked pool, and only because it was never
+in `score` to begin with — `_game_over`'s `final_score` reads `score` (banked-only).

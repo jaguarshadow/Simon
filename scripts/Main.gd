@@ -10,6 +10,95 @@ const RING_CENTER := Vector2(400.0, 400.0)
 
 const MODIFIER_ROUND_INTERVAL := 3
 
+# --- Modifier slot system (docs/modifier-expansion.md) ---
+# One equipped modifier per category at a time. Picking a *different*
+# modifier into a filled slot prompts swap-or-skip; picking the *same*
+# modifier already equipped in its slot levels it up (1-5, capped).
+const MODIFIER_CATEGORIES := ["multiplier", "defense", "tempo", "bonus_event"]
+const CATEGORY_LABELS := {"multiplier": "Multiplier", "defense": "Defense", "tempo": "Tempo", "bonus_event": "Bonus-Event"}
+const MAX_MODIFIER_LEVEL := 5
+
+# Musical chunking: sequences are built out of reused 3-note motifs some of
+# the time (instead of always-fresh notes), tagged with a shared chunk id so
+# Harmonic Chain/Motif Bonus have a real "repeated phrase" signal to key off.
+const CHUNK_SIZE := 3
+const CHUNK_REPEAT_CHANCE := 0.35
+
+# Perfect Pitch: rolling-window stdev of the player's own consecutive hit
+# intervals. Tight, consistent tapping (low stdev) earns the bonus - no
+# external timing grid needed, so it reads identically in Normal/Chaos/Duet.
+const PERFECT_PITCH_WINDOW := 4
+const PERFECT_PITCH_STDEV_THRESHOLD_MS := 90.0
+
+# Rubato: recent repeat-back pace (avg ms/note over the last completed round)
+# vs. this baseline decides "hesitant" (slow down) or "confident" (L5: speed
+# up) relative to the mode's own baseline note spacing.
+const RUBATO_BASELINE_MS_PER_NOTE := 650.0
+const RUBATO_HESITANT_RATIO := 1.35
+const RUBATO_CONFIDENT_RATIO := 0.75
+
+const FORTISSIMO_FANFARE_BONUS := 50
+
+const MODIFIERS := [
+	# --- Multiplier ---
+	{"id": "sharper_ear", "category": "multiplier", "icon": "♪", "title": "Sharper Ear", "desc": "Combo multiplier grows faster per hit", "power": false,
+		"levels": [{"combo_growth_bonus": 0.03}, {"combo_growth_bonus": 0.06}, {"combo_growth_bonus": 0.09}, {"combo_growth_bonus": 0.12}, {"combo_growth_bonus": 0.15}]},
+	{"id": "resonance", "category": "multiplier", "icon": "♦", "title": "Resonance", "desc": "Flat score bonus on all hits and cash-outs", "power": false,
+		"levels": [{"bonus": 0.04}, {"bonus": 0.08}, {"bonus": 0.12}, {"bonus": 0.16}, {"bonus": 0.20}]},
+	{"id": "crescendo", "category": "multiplier", "icon": "⟿", "title": "Crescendo", "desc": "Multiplier grows with waves completed this run", "power": false,
+		"levels": [{"per_wave": 0.05}, {"per_wave": 0.08}, {"per_wave": 0.12}, {"per_wave": 0.18}, {"per_wave": 0.25, "multiplicative": true}]},
+	{"id": "perfect_pitch", "category": "multiplier", "icon": "◎", "title": "Perfect Pitch", "desc": "Bonus for a steady, consistent tapping cadence", "power": false,
+		"levels": [{"bonus": 0.05}, {"bonus": 0.08}, {"bonus": 0.12}, {"bonus": 0.16}, {"bonus": 0.20}]},
+	{"id": "harmonic_chain", "category": "multiplier", "icon": "⛓", "title": "Harmonic Chain", "desc": "Stacking bonus for consecutive hits within a motif", "power": false,
+		"levels": [{"increment": 0.02}, {"increment": 0.03}, {"increment": 0.04}, {"increment": 0.05}, {"increment": 0.06, "carry_across_chunks": true}]},
+	{"id": "fortissimo", "category": "multiplier", "icon": "✺", "title": "Fortissimo", "desc": "Multiplier once your streak passes your own best this run", "power": true,
+		"unlock": {"type": "waves", "value": 10, "text": "Survive 10 waves in one run"},
+		"levels": [{"margin": 3, "mult": 1.3}, {"margin": 2, "mult": 1.4}, {"margin": 1, "mult": 1.6}, {"margin": 0, "mult": 1.8}, {"margin": -1, "mult": 2.2, "fanfare": true}]},
+	# --- Defense ---
+	{"id": "safety_net", "category": "defense", "icon": "❖", "title": "Safety Net", "desc": "Forgive mistakes and show the correct pad (charges)", "power": false,
+		"levels": [{"charges": 1}, {"charges": 2}, {"charges": 3}, {"charges": 4}, {"charges": 5, "hint_notes": 2}]},
+	{"id": "echo_chamber", "category": "defense", "icon": "☍", "title": "Echo Chamber", "desc": "Spend a Peek before a step to preview the next note", "power": false,
+		"levels": [{"charges": 1}, {"charges": 2}, {"charges": 3}, {"charges": 4}, {"charges": 5, "peek_notes": 3}]},
+	{"id": "muffled_strike", "category": "defense", "icon": "◔", "title": "Muffled Strike", "desc": "Unlimited chance a fatal miss is forgiven anyway", "power": false,
+		"levels": [{"chance": 0.10}, {"chance": 0.18}, {"chance": 0.28}, {"chance": 0.40}, {"chance": 0.55}]},
+	{"id": "grounding_resonance", "category": "defense", "icon": "≋", "title": "Grounding Resonance", "desc": "Slows this mode's per-round escalation ramp", "power": false,
+		"levels": [{"pct": 0.10}, {"pct": 0.18}, {"pct": 0.25}, {"pct": 0.32}, {"pct": 0.40}]},
+	{"id": "second_wind", "category": "defense", "icon": "↺", "title": "Second Wind", "desc": "A fatal miss forces an early cash-out instead of ending the run", "power": true,
+		"unlock": {"type": "flag", "key": "zero_miss_wave", "text": "Complete a wave with zero misses"},
+		"levels": [{"uses": 1}, {"uses": 2}, {"uses": 3}, {"uses": 4}, {"uses": 5, "clutch_bonus": 0.25}]},
+	{"id": "unbreakable", "category": "defense", "icon": "⛨", "title": "Unbreakable", "desc": "The first misses each streak are forgiven free", "power": true,
+		"unlock": {"type": "flag", "key": "zero_miss_wave", "text": "Complete a wave with zero misses"},
+		"levels": [{"free_misses": 1}, {"free_misses": 2}, {"free_misses": 3}, {"free_misses": 4}, {"free_misses": 5}]},
+	# --- Tempo ---
+	{"id": "steady_hands", "category": "tempo", "icon": "⏱", "title": "Steady Hands", "desc": "Sequence plays back slower", "power": false,
+		"levels": [{"pct": 0.08}, {"pct": 0.15}, {"pct": 0.22}, {"pct": 0.30}, {"pct": 0.40}]},
+	{"id": "patient_ear", "category": "tempo", "icon": "…", "title": "Patient Ear", "desc": "Longer pause before your turn starts", "power": false,
+		"levels": [{"sec": 0.3}, {"sec": 0.5}, {"sec": 0.8}, {"sec": 1.1}, {"sec": 1.5}]},
+	{"id": "metronome", "category": "tempo", "icon": "⚬", "title": "Metronome", "desc": "A subtle rhythmic pulse cue during playback", "power": false,
+		"levels": [{"salience": 1}, {"salience": 2}, {"salience": 3}, {"salience": 4}, {"salience": 5}]},
+	{"id": "slow_fade", "category": "tempo", "icon": "☾", "title": "Slow Fade", "desc": "Pad glow lingers longer after lighting", "power": false,
+		"levels": [{"sec": 0.2}, {"sec": 0.4}, {"sec": 0.6}, {"sec": 0.8}, {"sec": 1.0}]},
+	{"id": "breath_mark", "category": "tempo", "icon": "❜", "title": "Breath Mark", "desc": "Every 4th step gets a slightly longer pause", "power": false,
+		"levels": [{"pct": 0.10}, {"pct": 0.20}, {"pct": 0.32}, {"pct": 0.45}, {"pct": 0.60}]},
+	{"id": "rubato", "category": "tempo", "icon": "〜", "title": "Rubato", "desc": "Adaptive pacing: slows when you hesitate", "power": true,
+		"unlock": {"type": "combo", "value": 25, "text": "Reach a 25-combo in one run"},
+		"levels": [{"level": 1}, {"level": 2}, {"level": 3}, {"level": 4}, {"level": 5, "two_directional": true}]},
+	# --- Bonus-Event ---
+	{"id": "golden_step", "category": "bonus_event", "icon": "★", "title": "Golden Step", "desc": "Extra step(s) per round worth 3x points", "power": false,
+		"levels": [{"count": 1}, {"count": 2}, {"count": 3}, {"count": 4}, {"count": 5}]},
+	{"id": "double_down", "category": "bonus_event", "icon": "⚂", "title": "Double Down", "desc": "One flagged step per streak gambles the cash-out curve", "power": false,
+		"levels": [{"boost": 2}, {"boost": 3}, {"boost": 5}, {"boost": 7}, {"boost": 10, "chain": true}]},
+	{"id": "encore", "category": "bonus_event", "icon": "❢", "title": "Encore", "desc": "Cash-out replays the final phrase once more for a bonus", "power": false,
+		"levels": [{"pct": 0.50}, {"pct": 0.65}, {"pct": 0.80}, {"pct": 0.95}, {"pct": 1.10}]},
+	{"id": "lucky_strike", "category": "bonus_event", "icon": "✦", "title": "Lucky Strike", "desc": "Small chance of a surprise bonus-value pad each round", "power": false,
+		"levels": [{"chance": 0.05, "value_mult": 2.0}, {"chance": 0.09, "value_mult": 2.2}, {"chance": 0.14, "value_mult": 2.4}, {"chance": 0.20, "value_mult": 2.6}, {"chance": 0.28, "value_mult": 3.0}]},
+	{"id": "motif_bonus", "category": "bonus_event", "icon": "❦", "title": "Motif Bonus", "desc": "Flat bonus for correctly landing a full repeated motif", "power": false,
+		"levels": [{"amount": 15}, {"amount": 25}, {"amount": 40}, {"amount": 60}, {"amount": 90}]},
+	{"id": "grand_finale", "category": "bonus_event", "icon": "☀", "title": "Grand Finale", "desc": "Double or Nothing: wager the unbanked pool on one more note", "power": true,
+		"unlock": {"type": "flag", "key": "five_cashouts", "text": "Cash out 5 times in one run"},
+		"levels": [{"mult": 1.5}, {"mult": 1.8}, {"mult": 2.2}, {"mult": 2.7}, {"mult": 3.5, "insured": true}]},
+]
+
 # Wave-reset scoring escalation, player-triggered version: unlike the design
 # doc's original forced-cap-at-a-climbing-ceiling shape, there is no forced
 # reset - the player decides when to cash out a growing sequence/phrase for
@@ -144,7 +233,7 @@ const ONBOARDING_STEPS := [
 	{"title": "Score & Combo", "body": "Correct hits build a combo streak, which boosts your score multiplier. A forgiven miss halves your combo instead of wiping it out."},
 	{"title": "Cash Out Anytime", "body": "Your points build up as an unbanked streak total while you play. Tap Cash Out whenever you want to bank them - plus a bonus that grows the longer the streak ran - and start a fresh, short sequence. A miss before you cash out forfeits that streak's points, so bank when you don't want to risk it."},
 	{"title": "Five Ways to Play", "body": "Normal Mode is the standard growing sequence. Chaos reshuffles the pads and speeds up each round. Duet has the game play a short phrase for you to echo back exactly. Zen has no sequence or fail state - just play freely. Music plays itself for chill, hands-off listening."},
-	{"title": "Modifier Choices", "body": "Every 3rd round, pick one of three modifiers to stack for the rest of the run - they can change scoring, forgiveness, and pacing."},
+	{"title": "Modifier Choices", "body": "Every 3rd round, pick one of three modifiers. Multiplier, Defense, Tempo, and Bonus-Event each get one equipped slot - picking the same one again levels it up, picking a new one swaps it in."},
 ]
 
 @onready var background_rect: ColorRect = $Background
@@ -278,11 +367,67 @@ var _typed_buffer := ""
 
 # Modifier-driven run stats, reset each new run.
 var combo_growth := 0.1
-var mistake_charges := 0
 var golden_step_count := 0
 var sequence_speed_multiplier := 1.0
 var score_bonus_percent := 0.0
-var modifier_stacks: Dictionary = {}
+
+# --- Modifier slot system state ---
+# One id (or "") equipped per category; levels/resources persist for the
+# whole run even across a swap-out, so re-equipping a modifier later in the
+# same run resumes it rather than starting over.
+var equipped_modifiers: Dictionary = {"multiplier": "", "defense": "", "tempo": "", "bonus_event": ""}
+var modifier_levels: Dictionary = {}
+# Consumable resources (Safety Net/Echo Chamber charges, Second Wind uses) -
+# granted incrementally on level-up, spent during play; dormant (but not
+# lost) while their modifier is swapped out of its slot.
+var modifier_resource: Dictionary = {}
+var current_offer: Array = []
+# When a drafted pick would swap out a different modifier already filling
+# that category's slot, the choice pauses here awaiting confirmation.
+var pending_swap: Dictionary = {}
+
+# Pure per-level stat caches, recomputed by `_recompute_pure_modifier_stats()`
+# whenever equip/level state changes (cheap to recompute - unlike charges,
+# nothing here is ever "spent").
+var patient_ear_pause := 0.0
+var metronome_salience := 0
+var slow_fade_linger := 0.0
+var breath_mark_pct := 0.0
+var grounding_resonance_pct := 0.0
+var rubato_level := 0
+var rubato_two_directional := false
+
+# Per-streak / per-run mechanic state.
+var best_streak_this_run := 0
+var current_streak_had_miss := false
+var run_cashout_count := 0
+var unbreakable_forgiven_this_streak := 0
+var double_down_index := -1
+var double_down_chain_pending := false
+var double_down_boost_amount := 0
+var grand_finale_pending := false
+var hit_timestamps_ms: Array[int] = []
+var recent_response_ms_per_note: float = RUBATO_BASELINE_MS_PER_NOTE
+var _wave_start_ms := 0
+var _wave_hit_count := 0
+var sequence_chunk_id: Array[int] = []
+var chunk_history: Array[Array] = []
+var _next_chunk_id := 0
+var harmonic_chain_stack := 0.0
+var lucky_strike_index := -1
+
+# Persisted across runs (milestone gates for power modifiers).
+var best_waves := 0
+var zero_miss_wave_achieved := false
+var five_cashouts_achieved := false
+
+# Loadout HUD - built entirely at runtime (see _build_loadout_hud), same
+# pattern as _show_toast/_spawn_score_popup, so no scene-file changes are
+# needed for the slot system's UI.
+var loadout_hud: Control
+var loadout_slot_panels: Dictionary = {}
+var loadout_slot_labels: Dictionary = {}
+var peek_button: Button
 
 # Wave-reset state. `waves_completed` only increments on a voluntary cash
 # out (no forced cap to hit). Duet needs its own wave-local round counter
@@ -344,6 +489,7 @@ func _ready() -> void:
 	reduce_motion_check.toggled.connect(_on_reduce_motion_toggled)
 	_apply_theme()
 	_build_pads()
+	_build_loadout_hud()
 	if not onboarding_seen:
 		_show_onboarding()
 
@@ -734,6 +880,78 @@ func _show_toast(text: String) -> void:
 	t.tween_property(label, "modulate:a", 0.0, 0.5)
 	t.tween_callback(label.queue_free)
 
+# Persistent build-at-a-glance HUD: one chip per category slot (empty
+# outline if unequipped, icon + level if equipped) plus a Peek button that
+# only appears while Echo Chamber is equipped and has charges. Built purely
+# from code - same pattern as the score popups/toasts above - so no
+# scene-file changes were needed for the whole slot system's UI.
+func _build_loadout_hud() -> void:
+	loadout_hud = HBoxContainer.new()
+	loadout_hud.add_theme_constant_override("separation", 8)
+	loadout_hud.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	loadout_hud.position = Vector2(18, 18)
+	loadout_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(loadout_hud)
+	for cat in MODIFIER_CATEGORIES:
+		var chip := PanelContainer.new()
+		chip.custom_minimum_size = Vector2(96, 30)
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(1, 1, 1, 0.06)
+		sb.border_color = Color(1, 1, 1, 0.25)
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(6)
+		sb.content_margin_left = 8
+		sb.content_margin_right = 8
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		chip.add_theme_stylebox_override("panel", sb)
+		var lbl := Label.new()
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(lbl)
+		loadout_hud.add_child(chip)
+		loadout_slot_panels[cat] = chip
+		loadout_slot_labels[cat] = lbl
+	peek_button = Button.new()
+	peek_button.text = "Peek"
+	peek_button.visible = false
+	peek_button.focus_mode = Control.FOCUS_NONE
+	peek_button.pressed.connect(_use_echo_chamber_peek)
+	peek_button.pressed.connect(Sound.play_ui_tick.bind(660.0, 0.22))
+	loadout_hud.add_child(peek_button)
+	_refresh_loadout_hud()
+
+func _refresh_loadout_hud() -> void:
+	if loadout_hud == null:
+		return
+	loadout_hud.visible = not zen_mode and not music_mode
+	for cat in MODIFIER_CATEGORIES:
+		var id: String = equipped_modifiers[cat]
+		var lbl: Label = loadout_slot_labels[cat]
+		var chip: PanelContainer = loadout_slot_panels[cat]
+		var sb: StyleBoxFlat = chip.get_theme_stylebox("panel")
+		if id == "":
+			lbl.text = "%s: —" % CATEGORY_LABELS[cat].left(1)
+			sb.border_color = Color(1, 1, 1, 0.25)
+		else:
+			var mod := _mod_def(id)
+			var suffix := ""
+			if id == "safety_net" or id == "second_wind":
+				suffix = " (%d)" % int(modifier_resource.get(id, 0))
+			elif id == "unbreakable":
+				suffix = " (%d/%d)" % [_mod_level(id) - unbreakable_forgiven_this_streak, _mod_level(id)]
+			lbl.text = "%s Lv.%d%s" % [mod["icon"], _mod_level(id), suffix]
+			sb.border_color = Color(1, 0.85, 0.3, 0.9)
+	if equipped_modifiers["defense"] == "echo_chamber":
+		var charges := int(modifier_resource.get("echo_chamber", 0))
+		peek_button.visible = true
+		peek_button.disabled = charges <= 0 or not accepting_input
+		peek_button.text = "Peek (%d)" % charges
+	else:
+		peek_button.visible = false
+
 func _build_pads() -> void:
 	for i in PAD_COUNT:
 		var angle_deg := -90.0 + i * (360.0 / PAD_COUNT)
@@ -991,6 +1209,15 @@ func _meets_requirement(req: Dictionary) -> bool:
 			return best_score >= int(req["value"])
 		"combo":
 			return best_combo >= int(req["value"])
+		"waves":
+			return best_waves >= int(req["value"])
+		"flag":
+			var key := String(req["key"])
+			if key == "zero_miss_wave":
+				return zero_miss_wave_achieved
+			if key == "five_cashouts":
+				return five_cashouts_achieved
+			return false
 	return true
 
 func _is_unlocked(entry: Dictionary) -> bool:
@@ -1008,6 +1235,8 @@ func _requirement_text(req: Dictionary) -> String:
 			return "Score %d" % int(req["value"])
 		"combo":
 			return "Combo x%d" % int(req["value"])
+		"waves", "flag":
+			return String(req.get("text", ""))
 	return ""
 
 func _on_settings_button_pressed() -> void:
@@ -1137,6 +1366,9 @@ func _load_progress() -> void:
 	best_score = int(data.get("best_score", 0))
 	best_round = int(data.get("best_round", 0))
 	best_combo = int(data.get("best_combo", 0))
+	best_waves = int(data.get("best_waves", 0))
+	zero_miss_wave_achieved = bool(data.get("zero_miss_wave_achieved", false))
+	five_cashouts_achieved = bool(data.get("five_cashouts_achieved", false))
 	cheat_all_unlocked = bool(data.get("cheat_all_unlocked", false))
 	onboarding_seen = bool(data.get("onboarding_seen", false))
 	# Selected-id persistence for Palette and Theme (Theme mirrors Palette's
@@ -1166,6 +1398,9 @@ func _save_progress() -> void:
 		"best_score": best_score,
 		"best_round": best_round,
 		"best_combo": best_combo,
+		"best_waves": best_waves,
+		"zero_miss_wave_achieved": zero_miss_wave_achieved,
+		"five_cashouts_achieved": five_cashouts_achieved,
 		"cheat_all_unlocked": cheat_all_unlocked,
 		"onboarding_seen": onboarding_seen,
 		"mix_levels": mix_levels,
@@ -1511,16 +1746,18 @@ func _on_start_pressed(mode: String) -> void:
 	player_index = 0
 	score = 0
 	combo = 0
-	combo_growth = 0.1
-	mistake_charges = 0
-	golden_step_count = 0
-	sequence_speed_multiplier = 1.0
-	score_bonus_percent = 0.0
-	modifier_stacks.clear()
 	waves_completed = 0
 	duet_wave_round = 0
 	total_round = 0
 	unbanked_points = 0
+	run_cashout_count = 0
+	best_streak_this_run = 0
+	equipped_modifiers = {"multiplier": "", "defense": "", "tempo": "", "bonus_event": ""}
+	modifier_levels.clear()
+	modifier_resource.clear()
+	_recompute_pure_modifier_stats()
+	_start_new_streak_modifier_state()
+	_refresh_loadout_hud()
 	_update_score_labels()
 	start_button.disabled = true
 	chaos_button.disabled = true
@@ -1550,9 +1787,86 @@ func _current_wave_length() -> int:
 # should compound into cash-outs, not just per-hit score. This was a real
 # gap found in a modifier audit: Resonance's bonus previously only reached
 # `unbanked_points` (via `_register_hit`), never the streak bonus itself.
+# Crescendo (Multiplier): scales off waves completed *this run*, additive
+# by default, multiplicative (^waves_completed) at L5 - a genuinely
+# different growth shape for the mastery payoff, not just a bigger number.
+func _crescendo_multiplier() -> float:
+	if equipped_modifiers["multiplier"] != "crescendo":
+		return 1.0
+	var per_wave := float(_mod_val("crescendo", "per_wave"))
+	if bool(_mod_val("crescendo", "multiplicative")):
+		return pow(1.0 + per_wave, float(waves_completed))
+	return 1.0 + per_wave * float(waves_completed)
+
+# Fortissimo (Multiplier, power): active once the *current* streak passes
+# your own best streak this run by the level's margin.
+func _fortissimo_multiplier() -> float:
+	if equipped_modifiers["multiplier"] != "fortissimo":
+		return 1.0
+	var margin := int(_mod_val("fortissimo", "margin"))
+	if _current_wave_length() >= best_streak_this_run + margin:
+		return float(_mod_val("fortissimo", "mult"))
+	return 1.0
+
+# Perfect Pitch (Multiplier): bonus for a low-variance recent tapping
+# cadence - a real signal identical across Normal/Chaos/Duet.
+func _perfect_pitch_multiplier() -> float:
+	if equipped_modifiers["multiplier"] != "perfect_pitch":
+		return 1.0
+	if hit_timestamps_ms.size() < PERFECT_PITCH_WINDOW + 1:
+		return 1.0
+	var intervals: Array[float] = []
+	for i in range(1, hit_timestamps_ms.size()):
+		intervals.append(float(hit_timestamps_ms[i] - hit_timestamps_ms[i - 1]))
+	var mean := 0.0
+	for v in intervals:
+		mean += v
+	mean /= intervals.size()
+	var variance := 0.0
+	for v in intervals:
+		variance += (v - mean) * (v - mean)
+	variance /= intervals.size()
+	if sqrt(variance) <= PERFECT_PITCH_STDEV_THRESHOLD_MS:
+		return 1.0 + float(_mod_val("perfect_pitch", "bonus"))
+	return 1.0
+
+# Harmonic Chain (Multiplier): stacking bonus for consecutive hits within
+# the same musical chunk/motif - resets at the chunk boundary unless L5
+# ("carry_across_chunks"), in which case it just keeps growing.
+func _harmonic_chain_bonus_points(base_points: int) -> int:
+	if equipped_modifiers["multiplier"] != "harmonic_chain":
+		return 0
+	var cid := _chunk_id_at(player_index)
+	var prev_cid := _chunk_id_at(player_index - 1) if player_index > 0 else -1
+	var carries := bool(_mod_val("harmonic_chain", "carry_across_chunks"))
+	if player_index > 0 and (cid == prev_cid or carries):
+		harmonic_chain_stack += float(_mod_val("harmonic_chain", "increment"))
+	else:
+		harmonic_chain_stack = float(_mod_val("harmonic_chain", "increment"))
+	return int(round(float(base_points) * harmonic_chain_stack))
+
+func _register_wave_completed() -> void:
+	run_cashout_count += 1
+	if waves_completed > best_waves:
+		var was_unlocked := best_waves >= 10
+		best_waves = waves_completed
+		_save_progress()
+		if not was_unlocked and best_waves >= 10:
+			run_new_unlocks.append({"name": "10 Waves Survived (Fortissimo)"})
+	if not current_streak_had_miss and not zero_miss_wave_achieved:
+		zero_miss_wave_achieved = true
+		_save_progress()
+		run_new_unlocks.append({"name": "Zero-Miss Wave (Second Wind / Unbreakable)"})
+	if run_cashout_count >= 5 and not five_cashouts_achieved:
+		five_cashouts_achieved = true
+		_save_progress()
+		run_new_unlocks.append({"name": "5 Cash-Outs in a Run (Grand Finale)"})
+
 func _cash_out_streak_bonus() -> int:
-	var s := _current_wave_length()
+	var s := _current_wave_length() + double_down_boost_amount
 	var multiplier := (1.0 + float(combo - 1) * combo_growth) * (1.0 + score_bonus_percent)
+	multiplier *= _crescendo_multiplier()
+	multiplier *= _fortissimo_multiplier()
 	return int(round(CASHOUT_QUADRATIC_K * float(s) * float(s) * multiplier))
 
 # Total the player would bank right now: this streak's real per-hit points
@@ -1567,23 +1881,103 @@ func _cash_out_total() -> int:
 func _on_cash_out_button_pressed() -> void:
 	if zen_mode or music_mode or not accepting_input:
 		return
+	if equipped_modifiers["bonus_event"] == "grand_finale" and not grand_finale_pending:
+		_start_grand_finale_gamble()
+		return
 	var total := _cash_out_total()
 	if total <= 0:
 		return
+	var fortissimo_new_best := equipped_modifiers["multiplier"] == "fortissimo" and _mod_level("fortissimo") >= 5 and _current_wave_length() > best_streak_this_run
+	if fortissimo_new_best:
+		total += FORTISSIMO_FANFARE_BONUS
+	# Captured before the streak resets below - Encore needs the phrase that
+	# was just cashed out, not whatever's left after truncation/clearing.
+	var final_phrase: Array = sequence.duplicate()
 	score += total
 	unbanked_points = 0
 	waves_completed += 1
+	_register_wave_completed()
 	accepting_input = false
 	_set_pads_disabled(true)
 	if duet_mode:
 		duet_wave_round = 0
 	else:
 		sequence = sequence.slice(0, min(WAVE_RESET_LENGTH, sequence.size()))
+	_start_new_streak_modifier_state()
 	_update_score_labels()
 	_punch(score_label)
 	_spawn_score_popup(cash_out_button.global_position + cash_out_button.size / 2.0, "+%d" % total, Color(1, 0.85, 0.3))
 	_flash_screen(Color(1, 0.85, 0.3, 0.22))
+	if fortissimo_new_best:
+		_show_toast("Personal-Best Fanfare! +%d" % FORTISSIMO_FANFARE_BONUS)
+	if equipped_modifiers["bonus_event"] == "encore":
+		await _play_encore(total, final_phrase)
 	_next_round()
+
+# Encore (Bonus-Event): immediately replays the streak's final phrase once
+# more for a bonus before the reset - a legible payoff on top of an already
+# healthy cash-out, scaling to genuinely outpay the original at L5.
+func _play_encore(cashout_total: int, final_phrase: Array) -> void:
+	var pct := float(_mod_val("encore", "pct"))
+	var bonus := int(round(float(cashout_total) * pct))
+	if bonus <= 0 or final_phrase.is_empty():
+		return
+	await get_tree().create_timer(0.3).timeout
+	var replay: Array = final_phrase.slice(max(0, final_phrase.size() - 4), final_phrase.size())
+	for pad_name in replay:
+		await pads_by_name[pad_name].flash(0.22)
+		await get_tree().create_timer(0.12).timeout
+	score += bonus
+	_update_score_labels()
+	_spawn_score_popup(cash_out_button.global_position + cash_out_button.size / 2.0, "Encore +%d" % bonus, Color(1, 0.6, 0.9))
+
+# Grand Finale (Bonus-Event, power): opt-in "Double or Nothing" - wager the
+# entire unbanked pool on landing exactly one more correct note.
+func _start_grand_finale_gamble() -> void:
+	if unbanked_points <= 0:
+		return
+	grand_finale_pending = true
+	_show_toast("Double or Nothing! One note, x%.1f or bust." % float(_mod_val("grand_finale", "mult")))
+
+func _resolve_grand_finale(pad_name: String) -> void:
+	var win := pad_name == sequence[player_index]
+	if win:
+		var wagered := unbanked_points
+		var payout := int(round(float(wagered) * float(_mod_val("grand_finale", "mult"))))
+		unbanked_points = 0
+		score += payout
+		waves_completed += 1
+		_register_wave_completed()
+		grand_finale_pending = false
+		accepting_input = false
+		_set_pads_disabled(true)
+		if duet_mode:
+			duet_wave_round = 0
+		else:
+			sequence = sequence.slice(0, min(WAVE_RESET_LENGTH, sequence.size()))
+		_start_new_streak_modifier_state()
+		_update_score_labels()
+		_spawn_score_popup(cash_out_button.global_position, "Double! +%d" % payout, Color(1, 0.85, 0.3))
+		_flash_screen(Color(1, 0.85, 0.3, 0.3))
+		_next_round()
+	else:
+		var insured := bool(_mod_val("grand_finale", "insured"))
+		if insured:
+			_show_toast("Insured - try again.")
+			return
+		_show_toast("Nothing. Wager lost.")
+		unbanked_points = 0
+		grand_finale_pending = false
+		accepting_input = false
+		_set_pads_disabled(true)
+		if duet_mode:
+			duet_wave_round = 0
+		else:
+			sequence.clear()
+		_start_new_streak_modifier_state()
+		_update_score_labels()
+		_flash_screen(Color(1, 0.3, 0.5, 0.25))
+		_next_round()
 
 func _next_round() -> void:
 	accepting_input = false
@@ -1597,17 +1991,22 @@ func _next_round() -> void:
 	elif chaos_mode:
 		sequence.append(pad_names[randi() % pad_names.size()])
 		total_round += 1
+		_tag_chunk_for_new_note()
 	else:
 		sequence.append(_normal_next_pad_name())
 		total_round += 1
+		_tag_chunk_for_new_note()
 	var round_prefix := "Chaos - " if chaos_mode else ("Duet - " if duet_mode else "")
 	var wave_suffix := "  (Streak %d)" % _current_wave_length()
 	round_label.text = (round_prefix + "Round: %d") % _current_round() + wave_suffix
 	_roll_gold_indices()
+	_roll_lucky_strike_index()
 	await _play_sequence()
 	if duet_mode:
 		await _run_duet_response()
 		return
+	if patient_ear_pause > 0.0:
+		await get_tree().create_timer(patient_ear_pause).timeout
 	player_index = 0
 	accepting_input = true
 	_set_pads_disabled(false)
@@ -1618,8 +2017,9 @@ func _next_round() -> void:
 # fresh phrase, since Duet's challenge is timing/note precision per phrase,
 # not memorizing an ever-growing sequence (that's Normal Mode's job).
 func _generate_duet_phrase() -> void:
-	var bpm_lo := minf(DUET_BPM_BASE_MIN + float(duet_wave_round) * DUET_BPM_RAMP_PER_ROUND, DUET_BPM_CAP - 10.0)
-	var bpm_hi := minf(DUET_BPM_BASE_MAX + float(duet_wave_round) * DUET_BPM_RAMP_PER_ROUND, DUET_BPM_CAP)
+	var ramp_per_round := DUET_BPM_RAMP_PER_ROUND * (1.0 - grounding_resonance_pct)
+	var bpm_lo := minf(DUET_BPM_BASE_MIN + float(duet_wave_round) * ramp_per_round, DUET_BPM_CAP - 10.0)
+	var bpm_hi := minf(DUET_BPM_BASE_MAX + float(duet_wave_round) * ramp_per_round, DUET_BPM_CAP)
 	var bpm := randf_range(bpm_lo, bpm_hi)
 	duet_step_duration = 60.0 / bpm / 4.0
 	var pulses_lo := clampi(1 + duet_wave_round, 2, MUSIC_PULSES_MIN)
@@ -1635,9 +2035,11 @@ func _generate_duet_phrase() -> void:
 		t += duet_step_duration
 	var melody := _generate_music_bar_melody(pulse_count)
 	sequence.clear()
+	sequence_chunk_id.clear()
 	for degree in melody:
 		var pad := _music_pad_for_degree(degree)
 		sequence.append(pad.pad_name if pad else pad_names[0])
+		_tag_chunk_for_new_note()
 
 func _normal_reset_walk() -> void:
 	# Unlike Music/Duet's phrases, which always open on the tonic, Normal
@@ -1721,18 +2123,47 @@ func _roll_gold_indices() -> void:
 	var take: int = min(golden_step_count, pool.size())
 	gold_indices = pool.slice(0, take)
 
+# Rubato (Tempo, power): adaptive pacing off recent tapping pace vs. the
+# mode's own baseline - relief-only through L4 (never faster than normal),
+# genuinely two-directional at L5 (a confident streak plays back faster).
+func _rubato_speed_factor() -> float:
+	if equipped_modifiers["tempo"] != "rubato" or rubato_level <= 0:
+		return 1.0
+	var responsiveness := float(rubato_level) / float(MAX_MODIFIER_LEVEL)
+	var ratio := recent_response_ms_per_note / RUBATO_BASELINE_MS_PER_NOTE
+	if ratio >= RUBATO_HESITANT_RATIO:
+		return 1.0 + 0.35 * responsiveness
+	if rubato_two_directional and ratio <= RUBATO_CONFIDENT_RATIO:
+		return 1.0 - 0.25 * responsiveness
+	return 1.0
+
+func _metronome_pulse() -> void:
+	if equipped_modifiers["tempo"] == "metronome" and metronome_salience > 0:
+		round_label.scale = Vector2.ONE * (1.0 + 0.03 * float(metronome_salience))
+		var t := create_tween()
+		t.tween_property(round_label, "scale", Vector2.ONE, 0.12)
+
+func _flash_duration_for_pad() -> float:
+	return slow_fade_linger
+
 func _play_sequence() -> void:
 	if duet_mode:
 		await _play_duet_call()
 		return
 	var chaos_speed := 1.0
 	if chaos_mode:
-		chaos_speed = clamp(1.0 - float(sequence.size() - 1) * 0.05, 0.5, 1.0)
-	var duration_scale := sequence_speed_multiplier * chaos_speed
+		var ramp_rate := 0.05 * (1.0 - grounding_resonance_pct)
+		chaos_speed = clamp(1.0 - float(sequence.size() - 1) * ramp_rate, 0.5, 1.0)
+	var duration_scale := sequence_speed_multiplier * chaos_speed * _rubato_speed_factor()
 	await get_tree().create_timer(0.6).timeout
-	for pad_name in sequence:
-		await pads_by_name[pad_name].flash(0.4 * duration_scale)
-		await get_tree().create_timer(0.25 * duration_scale).timeout
+	for i in sequence.size():
+		var pad_name: String = sequence[i]
+		_metronome_pulse()
+		await pads_by_name[pad_name].flash(0.4 * duration_scale + _flash_duration_for_pad())
+		var gap := 0.25 * duration_scale
+		if breath_mark_pct > 0.0 and (i + 1) % 4 == 0:
+			gap *= 1.0 + breath_mark_pct
+		await get_tree().create_timer(gap).timeout
 
 # Plays the Duet call phrase on its actual Euclidean-rhythm grid (not
 # uniform gaps like Normal/Chaos) so the call's timing is the thing the
@@ -1741,12 +2172,17 @@ func _play_duet_call() -> void:
 	await get_tree().create_timer(0.6).timeout
 	var flash_duration: float = min(duet_step_duration * MUSIC_FLASH_FRACTION, MUSIC_FLASH_MAX)
 	var note_i := 0
+	var step_i := 0
 	for step_on in duet_rhythm:
 		if step_on:
 			var pad_name: String = sequence[note_i]
 			note_i += 1
-			await pads_by_name[pad_name].flash(flash_duration)
+			step_i += 1
+			_metronome_pulse()
+			await pads_by_name[pad_name].flash(flash_duration + _flash_duration_for_pad())
 			var remaining := duet_step_duration - flash_duration
+			if breath_mark_pct > 0.0 and step_i % 4 == 0:
+				remaining += duet_step_duration * breath_mark_pct
 			if remaining > 0.0:
 				await get_tree().create_timer(remaining).timeout
 		else:
@@ -1760,6 +2196,8 @@ func _play_duet_call() -> void:
 # timing accuracy only scales the score via `_register_hit`'s
 # `timing_multiplier`, never fails a round on its own.
 func _run_duet_response() -> void:
+	if patient_ear_pause > 0.0:
+		await get_tree().create_timer(patient_ear_pause).timeout
 	accepting_input = true
 	_set_pads_disabled(false)
 	var response_start_ms := Time.get_ticks_msec()
@@ -1793,16 +2231,23 @@ func _run_duet_response() -> void:
 		await _offer_modifier_choice()
 	_next_round()
 
-# Returns true if forgiven (caller should retry the same note index), false
-# if the run ended and the caller should stop.
+# Returns true if forgiven/converted (caller should retry the same note
+# index or the round already got re-triggered), false if the run ended.
 func _handle_duet_miss() -> bool:
-	if mistake_charges > 0:
-		mistake_charges -= 1
-		combo = combo / 2
-		_update_score_labels()
-		_flash_forgiven()
-		await _flash_miss_hint(sequence[player_index])
-		return true
+	if double_down_index == player_index and equipped_modifiers["bonus_event"] == "double_down":
+		_forfeit_streak_from_double_down()
+		return false
+	var outcome := _resolve_defense_on_miss()
+	match outcome:
+		"forgiven_hint":
+			combo = combo / 2
+			_update_score_labels()
+			_flash_forgiven()
+			await _flash_miss_hint(sequence[player_index])
+			return true
+		"forced_cashout":
+			await _force_cash_out_from_second_wind()
+			return false
 	_game_over()
 	return false
 
@@ -1815,7 +2260,12 @@ func _on_pad_pressed(pad_name: String) -> void:
 		_duet_last_press = pad_name
 		_duet_last_press_pos = get_viewport().get_mouse_position()
 		return
+	if grand_finale_pending:
+		await _resolve_grand_finale(pad_name)
+		return
 	if pad_name == sequence[player_index]:
+		if double_down_index == player_index and equipped_modifiers["bonus_event"] == "double_down":
+			_land_double_down()
 		_register_hit(pad_name, get_viewport().get_mouse_position())
 		player_index += 1
 		if player_index == sequence.size():
@@ -1827,23 +2277,107 @@ func _on_pad_pressed(pad_name: String) -> void:
 				await _offer_modifier_choice()
 			_next_round()
 	else:
-		if mistake_charges > 0:
-			mistake_charges -= 1
-			combo = combo / 2
-			_update_score_labels()
-			_flash_forgiven()
-			await _flash_miss_hint(sequence[player_index])
-		else:
-			_game_over()
+		if double_down_index == player_index and equipped_modifiers["bonus_event"] == "double_down":
+			_forfeit_streak_from_double_down()
+			return
+		var outcome := _resolve_defense_on_miss()
+		match outcome:
+			"forgiven_hint":
+				combo = combo / 2
+				_update_score_labels()
+				_flash_forgiven()
+				await _flash_miss_hint(sequence[player_index])
+			"forced_cashout":
+				await _force_cash_out_from_second_wind()
+			_:
+				_game_over()
+
+# Double Down's flagged gamble step: a hit temporarily boosts the effective
+# streak length the cash-out formula reads (docs/modifier-expansion.md);
+# a miss forfeits the streak early without ending the run or costing a
+# Defense resource - it's a self-contained wager, not a normal miss.
+func _land_double_down() -> void:
+	var boost := int(_mod_val("double_down", "boost"))
+	double_down_boost_amount += boost
+	_spawn_score_popup(pads_by_name[sequence[player_index]].global_position + Vector2(35, 85), "Double Down!", Color(1, 0.6, 0.9))
+	if bool(_mod_val("double_down", "chain")) and not double_down_chain_pending:
+		double_down_chain_pending = true
+		double_down_index = player_index + randi_range(2, 5)
+	else:
+		double_down_index = -1
+
+func _forfeit_streak_from_double_down() -> void:
+	_show_toast("Double Down missed - streak forfeited")
+	_screen_shake(4.0, 0.15)
+	_flash_screen(Color(1, 0.3, 0.5, 0.2))
+	unbanked_points = 0
+	double_down_boost_amount = 0
+	accepting_input = false
+	_set_pads_disabled(true)
+	if duet_mode:
+		duet_wave_round = 0
+	else:
+		sequence.clear()
+	_start_new_streak_modifier_state()
+	_update_score_labels()
+	_next_round()
+
+# Second Wind's last resort: the streak ends (banking whatever was
+# unbanked at the normal formula, same as a voluntary cash-out) but the run
+# continues into a fresh streak - consumes one Second Wind use.
+func _force_cash_out_from_second_wind() -> void:
+	var total := _cash_out_total()
+	var clutch := 1.0 + float(_mod_val("second_wind", "clutch_bonus", -1, 0.0)) if _mod_level("second_wind") >= 5 else 1.0
+	total = int(round(float(total) * clutch))
+	if total > 0:
+		score += total
+		_spawn_score_popup(cash_out_button.global_position + cash_out_button.size / 2.0, "+%d" % total, Color(0.6, 0.9, 1.0))
+	_show_toast("Second Wind! Streak saved.")
+	unbanked_points = 0
+	waves_completed += 1
+	_register_wave_completed()
+	accepting_input = false
+	_set_pads_disabled(true)
+	if duet_mode:
+		duet_wave_round = 0
+	else:
+		sequence.clear()
+	_start_new_streak_modifier_state()
+	_update_score_labels()
+	_flash_screen(Color(1, 0.85, 0.3, 0.22))
+	_next_round()
 
 func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.0) -> void:
 	combo += 1
+	_wave_hit_count += 1
+	var now_ms := Time.get_ticks_msec()
+	if not hit_timestamps_ms.is_empty():
+		var interval := float(now_ms - hit_timestamps_ms[hit_timestamps_ms.size() - 1])
+		if interval > 0.0 and interval < 6000.0:
+			recent_response_ms_per_note = lerpf(recent_response_ms_per_note, interval, 0.35)
+	hit_timestamps_ms.append(now_ms)
+	if hit_timestamps_ms.size() > PERFECT_PITCH_WINDOW + 1:
+		hit_timestamps_ms.pop_front()
 	var multiplier := 1.0 + float(combo - 1) * combo_growth
+	multiplier *= _fortissimo_multiplier()
+	multiplier *= _perfect_pitch_multiplier()
 	var points := int(round(10.0 * multiplier * timing_multiplier))
 	if player_index in gold_indices:
 		points *= 3
+	if player_index == lucky_strike_index:
+		points = int(round(points * float(_mod_val("lucky_strike", "value_mult"))))
+		lucky_strike_index = -1
+		_show_toast("Lucky Strike!")
+	points += _harmonic_chain_bonus_points(points)
 	points = int(round(points * (1.0 + score_bonus_percent)))
 	unbanked_points += points
+	if _completed_repeated_chunk(player_index) and equipped_modifiers["bonus_event"] == "motif_bonus":
+		var bonus := int(_mod_val("motif_bonus", "amount"))
+		unbanked_points += bonus
+		_spawn_score_popup(click_pos + Vector2(0, -20), "Motif +%d" % bonus, Color(0.8, 0.6, 1.0))
+	var cur_wave: int = _current_wave_length()
+	if cur_wave > best_streak_this_run:
+		best_streak_this_run = cur_wave
 	_register_best(_current_round(), score, combo)
 	_update_score_labels()
 	_punch(combo_label)
@@ -1851,19 +2385,241 @@ func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.
 	_spawn_burst(click_pos, pads_by_name[pad_name].lit_color)
 	_screen_shake(3.0, 0.12)
 
+# --- Modifier slot system: data lookups ---
+
+func _mod_def(id: String) -> Dictionary:
+	for mod in MODIFIERS:
+		if mod["id"] == id:
+			return mod
+	return {}
+
+func _mod_level(id: String) -> int:
+	return int(modifier_levels.get(id, 0))
+
+# Reads a per-level numeric field for `id`. Defaults to the *current* level;
+# pass an explicit level (1-5) to preview a different one (used by the draft
+# panel to show what a level-up would grant).
+func _mod_val(id: String, key: String, level := -1, fallback: Variant = 0) -> Variant:
+	var lvl: int = level if level > 0 else _mod_level(id)
+	if lvl <= 0:
+		lvl = 1
+	var mod := _mod_def(id)
+	if mod.is_empty():
+		return fallback
+	var levels: Array = mod["levels"]
+	var idx: int = clampi(lvl, 1, levels.size()) - 1
+	return levels[idx].get(key, fallback)
+
+func _mod_category(id: String) -> String:
+	return String(_mod_def(id).get("category", ""))
+
+# Pure (non-consumable) per-level stats - safe to fully recompute from
+# scratch any time equip/level state changes, unlike charges/uses which are
+# spent during play and must only ever be granted incrementally.
+func _recompute_pure_modifier_stats() -> void:
+	combo_growth = 0.1
+	score_bonus_percent = 0.0
+	var mult_id: String = equipped_modifiers["multiplier"]
+	if mult_id == "sharper_ear":
+		combo_growth += _mod_val(mult_id, "combo_growth_bonus")
+	elif mult_id == "resonance":
+		score_bonus_percent += _mod_val(mult_id, "bonus")
+
+	golden_step_count = 0
+	if equipped_modifiers["bonus_event"] == "golden_step":
+		golden_step_count = int(_mod_val("golden_step", "count"))
+
+	sequence_speed_multiplier = 1.0
+	if equipped_modifiers["tempo"] == "steady_hands":
+		sequence_speed_multiplier = 1.0 + float(_mod_val("steady_hands", "pct"))
+
+	patient_ear_pause = 0.0
+	metronome_salience = 0
+	slow_fade_linger = 0.0
+	breath_mark_pct = 0.0
+	rubato_level = 0
+	rubato_two_directional = false
+	var tempo_id: String = equipped_modifiers["tempo"]
+	match tempo_id:
+		"patient_ear":
+			patient_ear_pause = float(_mod_val(tempo_id, "sec"))
+		"metronome":
+			metronome_salience = int(_mod_val(tempo_id, "salience"))
+		"slow_fade":
+			slow_fade_linger = float(_mod_val(tempo_id, "sec"))
+		"breath_mark":
+			breath_mark_pct = float(_mod_val(tempo_id, "pct"))
+		"rubato":
+			rubato_level = _mod_level(tempo_id)
+			rubato_two_directional = bool(_mod_val(tempo_id, "two_directional"))
+
+	grounding_resonance_pct = 0.0
+	if equipped_modifiers["defense"] == "grounding_resonance":
+		grounding_resonance_pct = float(_mod_val("grounding_resonance", "pct"))
+	_update_score_labels()
+
+# Consumable resources are granted incrementally, never recomputed - spent
+# charges must stay spent. Called once whenever a modifier's level rises
+# (fresh equip counts as 0 -> 1).
+func _grant_resource_on_levelup(id: String, from_level: int, to_level: int) -> void:
+	match id:
+		"safety_net", "echo_chamber":
+			var gained := 0
+			for lvl in range(from_level + 1, to_level + 1):
+				gained += lvl
+			modifier_resource[id] = int(modifier_resource.get(id, 0)) + gained
+		"second_wind":
+			# "Uses per run" reads as level-scoped rather than cumulative -
+			# grant just the delta so a mid-run level-up adds uses without
+			# resetting ones already spent this run.
+			var delta := int(_mod_val(id, "uses", to_level)) - int(_mod_val(id, "uses", from_level)) if from_level > 0 else int(_mod_val(id, "uses", to_level))
+			modifier_resource[id] = int(modifier_resource.get(id, 0)) + delta
+
+# Per-streak state: reset at run start and on every cash-out (a streak is
+# one growing sequence/phrase between resets).
+func _start_new_streak_modifier_state() -> void:
+	unbreakable_forgiven_this_streak = 0
+	current_streak_had_miss = false
+	double_down_index = -1
+	double_down_chain_pending = false
+	double_down_boost_amount = 0
+	grand_finale_pending = false
+	harmonic_chain_stack = 0.0
+	lucky_strike_index = -1
+	sequence_chunk_id.clear()
+	chunk_history.clear()
+	_next_chunk_id = 0
+	_wave_start_ms = Time.get_ticks_msec()
+	_wave_hit_count = 0
+	if equipped_modifiers["bonus_event"] == "double_down":
+		_roll_double_down_index()
+
+func _roll_double_down_index() -> void:
+	# Flags a future step (a few rounds out) as the streak's gamble note -
+	# picked once per streak, not re-rolled every round.
+	double_down_index = randi_range(2, 6)
+
+# Re-rolled every round (unlike Double Down's once-per-streak flag) - a
+# small chance *this specific round* has a surprise bonus-value pad, at
+# whichever index the player is about to reach next.
+func _roll_lucky_strike_index() -> void:
+	lucky_strike_index = -1
+	if equipped_modifiers["bonus_event"] != "lucky_strike":
+		return
+	if sequence.is_empty():
+		return
+	if randf() < float(_mod_val("lucky_strike", "chance")):
+		lucky_strike_index = sequence.size() - 1
+
+# --- Musical chunking: tags newly-appended sequence notes as belonging to a
+# repeated motif some of the time, giving Harmonic Chain/Motif Bonus a real
+# "is this note part of a repeated phrase" signal. Only engages once a full
+# CHUNK_SIZE-note chunk has completed elsewhere in the sequence.
+func _tag_chunk_for_new_note() -> void:
+	var idx := sequence.size() - 1
+	var pos_in_chunk := idx % CHUNK_SIZE
+	if pos_in_chunk == 0 and idx >= CHUNK_SIZE and randf() < CHUNK_REPEAT_CHANCE and not chunk_history.is_empty():
+		var reused: Array = chunk_history[randi() % chunk_history.size()]
+		if idx + reused.size() <= sequence.size() + CHUNK_SIZE - 1:
+			var reuse_id: int = reused[0]
+			for i in range(sequence_chunk_id.size(), idx):
+				sequence_chunk_id.append(_next_chunk_id)
+			sequence_chunk_id.append(reuse_id)
+			return
+	for i in range(sequence_chunk_id.size(), idx):
+		sequence_chunk_id.append(_next_chunk_id)
+	sequence_chunk_id.append(_next_chunk_id)
+	if pos_in_chunk == CHUNK_SIZE - 1:
+		chunk_history.append([_next_chunk_id])
+		_next_chunk_id += 1
+
+func _chunk_id_at(idx: int) -> int:
+	return sequence_chunk_id[idx] if idx < sequence_chunk_id.size() else -1
+
+# True if the chunk containing `idx` is a repeat of an earlier chunk (i.e.
+# its id was reused rather than freshly minted) and `idx` is the chunk's
+# final note - the moment "you just landed a whole repeated motif."
+func _completed_repeated_chunk(idx: int) -> bool:
+	if (idx + 1) % CHUNK_SIZE != 0:
+		return false
+	var cid := _chunk_id_at(idx)
+	if cid < 0:
+		return false
+	var first_use := true
+	for i in range(idx + 1):
+		if i != idx and _chunk_id_at(i) == cid:
+			first_use = false
+			break
+	return not first_use
+
+# --- Defense resolution ---
+
+# Returns "forgiven_hint" (combo halves, correct pad hinted, unbanked points
+# already always protected by this codebase's forgiveness path), "forced_cashout"
+# (Second Wind), or "game_over".
+func _resolve_defense_on_miss() -> String:
+	current_streak_had_miss = true
+	var def_id: String = equipped_modifiers["defense"]
+	match def_id:
+		"safety_net":
+			if int(modifier_resource.get("safety_net", 0)) > 0:
+				modifier_resource["safety_net"] -= 1
+				return "forgiven_hint"
+		"unbreakable":
+			var lvl := _mod_level("unbreakable")
+			if unbreakable_forgiven_this_streak < lvl:
+				unbreakable_forgiven_this_streak += 1
+				return "forgiven_hint"
+		"muffled_strike":
+			if randf() < float(_mod_val("muffled_strike", "chance")):
+				return "forgiven_hint"
+		"second_wind":
+			if int(modifier_resource.get("second_wind", 0)) > 0:
+				modifier_resource["second_wind"] -= 1
+				return "forced_cashout"
+	return "game_over"
+
+func _hint_note_count() -> int:
+	if equipped_modifiers["defense"] == "safety_net" and _mod_level("safety_net") >= 5:
+		return int(_mod_val("safety_net", "hint_notes", -1, 1))
+	return 1
+
+# --- Draft flow ---
+
 func _offer_modifier_choice() -> void:
-	current_offer = MODIFIERS.duplicate()
-	current_offer.shuffle()
-	current_offer = current_offer.slice(0, 3)
+	var pool: Array = []
+	for mod in MODIFIERS:
+		if _mod_level(mod["id"]) >= MAX_MODIFIER_LEVEL:
+			continue
+		if mod["power"] and not _is_unlocked(mod):
+			continue
+		pool.append(mod)
+	pool.shuffle()
+	current_offer = pool.slice(0, min(3, pool.size()))
 	for i in modifier_buttons.size():
+		if i >= current_offer.size():
+			modifier_buttons[i].visible = false
+			continue
+		modifier_buttons[i].visible = true
 		var mod: Dictionary = current_offer[i]
-		var stack_count: int = modifier_stacks.get(mod["id"], 0)
-		var stack_suffix := "  (active x%d)" % stack_count if stack_count > 0 else ""
-		modifier_buttons[i].text = "%s %s%s\n%s" % [mod["icon"], mod["title"], stack_suffix, mod["desc"]]
+		var id: String = mod["id"]
+		var cat: String = mod["category"]
+		var cur_level := _mod_level(id)
+		var status: String
+		if equipped_modifiers[cat] == id:
+			status = "Level Up -> Lv.%d" % (cur_level + 1)
+		elif cur_level > 0:
+			status = "Re-equip (Lv.%d) - swaps %s" % [cur_level, CATEGORY_LABELS[cat]]
+		elif equipped_modifiers[cat] != "":
+			status = "New - swaps %s" % CATEGORY_LABELS[cat]
+		else:
+			status = "New Pick"
+		var power_tag := "  [POWER]" if mod["power"] else ""
+		modifier_buttons[i].text = "%s %s%s  (%s)\n%s" % [mod["icon"], mod["title"], power_tag, status, mod["desc"]]
 	await _reveal_modifier_panel()
 	var chosen_id: String = await _modifier_picked
 	modifier_panel.visible = false
-	_apply_modifier(chosen_id)
+	await _resolve_modifier_pick(chosen_id)
 
 # Dramatic reveal for the modifier choice - it's a meaningful decision point,
 # so it gets a heavier scale + glow-in treatment than routine panel opens.
@@ -1885,19 +2641,85 @@ func _on_modifier_button_pressed(index: int) -> void:
 	if index < current_offer.size():
 		_modifier_picked.emit(current_offer[index]["id"])
 
-func _apply_modifier(id: String) -> void:
-	modifier_stacks[id] = int(modifier_stacks.get(id, 0)) + 1
-	match id:
-		"sharper_ear":
-			combo_growth += 0.05
-		"safety_net":
-			mistake_charges += 1
-		"golden_step":
-			golden_step_count += 1
-		"steady_hands":
-			sequence_speed_multiplier *= 1.15
-		"resonance":
-			score_bonus_percent += 0.1
+# Routes a drafted pick: level-up (same id already equipped), direct equip
+# (empty slot), or swap-or-skip (a different id already fills that slot).
+func _resolve_modifier_pick(id: String) -> void:
+	var cat := _mod_category(id)
+	var incumbent: String = equipped_modifiers[cat]
+	if incumbent == id or incumbent == "":
+		_apply_modifier_pick(id)
+		return
+	await _show_swap_or_skip_dialog(id, incumbent)
+
+func _apply_modifier_pick(id: String) -> void:
+	var cat := _mod_category(id)
+	var from_level := _mod_level(id)
+	var to_level: int = min(from_level + 1, MAX_MODIFIER_LEVEL)
+	equipped_modifiers[cat] = id
+	modifier_levels[id] = to_level
+	_grant_resource_on_levelup(id, from_level, to_level)
+	if id == "unbreakable" or id == "second_wind":
+		unbreakable_forgiven_this_streak = 0
+	_recompute_pure_modifier_stats()
+	_refresh_loadout_hud()
+	var mod := _mod_def(id)
+	_show_toast("%s %s -> Lv.%d" % [mod["icon"], mod["title"], to_level])
+
+# Runtime-built confirm popup (same pattern as _show_toast/_spawn_score_popup
+# - no new scene nodes needed). Resolves once the player confirms or skips.
+func _show_swap_or_skip_dialog(new_id: String, incumbent_id: String) -> void:
+	var new_mod := _mod_def(new_id)
+	var old_mod := _mod_def(incumbent_id)
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.55)
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(dim)
+	var box := PanelContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER)
+	box.position -= Vector2(160, 90)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.09, 0.1, 0.97)
+	sb.border_color = Color(1, 0.85, 0.3)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(10)
+	sb.content_margin_left = 20
+	sb.content_margin_right = 20
+	sb.content_margin_top = 16
+	sb.content_margin_bottom = 16
+	box.add_theme_stylebox_override("panel", sb)
+	dim.add_child(box)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	box.add_child(vbox)
+	var label := Label.new()
+	label.text = "%s slot is filled by %s.\nSwap in %s, or keep %s?" % [CATEGORY_LABELS[_mod_category(new_id)], old_mod["title"], new_mod["title"], old_mod["title"]]
+	label.autowrap_mode = 2
+	label.custom_minimum_size = Vector2(280, 0)
+	vbox.add_child(label)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	vbox.add_child(row)
+	var swap_btn := Button.new()
+	swap_btn.text = "Swap to %s" % new_mod["title"]
+	row.add_child(swap_btn)
+	var skip_btn := Button.new()
+	skip_btn.text = "Keep %s" % old_mod["title"]
+	row.add_child(skip_btn)
+	var done := false
+	var do_swap := false
+	swap_btn.pressed.connect(func():
+		do_swap = true
+		done = true)
+	skip_btn.pressed.connect(func():
+		done = true)
+	while not done:
+		await get_tree().process_frame
+	dim.queue_free()
+	if do_swap:
+		# The incumbent's level/resources are left untouched (dormant, not
+		# lost) - re-drafting it later in the same run resumes where it
+		# left off rather than starting over.
+		_apply_modifier_pick(new_id)
 
 func _game_over() -> void:
 	accepting_input = false
@@ -1973,7 +2795,34 @@ func _flash_forgiven() -> void:
 # click can't sneak in ahead of it.
 func _flash_miss_hint(pad_name: String) -> void:
 	_set_pads_disabled(true)
+	var extra := _hint_note_count() - 1
 	await pads_by_name[pad_name].flash(0.35)
+	for i in extra:
+		var idx: int = player_index + 1 + i
+		if idx >= sequence.size():
+			break
+		await get_tree().create_timer(0.15).timeout
+		await pads_by_name[sequence[idx]].flash(0.3)
+	_set_pads_disabled(false)
+
+# Echo Chamber (Defense): proactive - spent *before* attempting a step
+# you're unsure of, rather than reactively on a miss like Safety Net. A
+# genuinely different resource-spending tradeoff, not a flavor duplicate.
+func _use_echo_chamber_peek() -> void:
+	if equipped_modifiers["defense"] != "echo_chamber" or not accepting_input or duet_mode:
+		return
+	if int(modifier_resource.get("echo_chamber", 0)) <= 0:
+		return
+	modifier_resource["echo_chamber"] -= 1
+	_refresh_loadout_hud()
+	var peek_count: int = int(_mod_val("echo_chamber", "peek_notes", -1, 1))
+	_set_pads_disabled(true)
+	for i in peek_count:
+		var idx: int = player_index + i
+		if idx >= sequence.size():
+			break
+		await pads_by_name[sequence[idx]].flash(0.3)
+		await get_tree().create_timer(0.12).timeout
 	_set_pads_disabled(false)
 
 func _update_score_labels() -> void:
@@ -1984,7 +2833,13 @@ func _update_score_labels() -> void:
 	else:
 		combo_label.text = ""
 	var total := _cash_out_total()
-	cash_out_button.text = "Cash Out (+%d)" % total if total > 0 else "Cash Out"
+	if grand_finale_pending:
+		cash_out_button.text = "Land the note! (x%.1f)" % float(_mod_val("grand_finale", "mult"))
+	elif equipped_modifiers["bonus_event"] == "grand_finale" and unbanked_points > 0:
+		cash_out_button.text = "Double or Nothing (+%d -> x%.1f)" % [total, float(_mod_val("grand_finale", "mult"))]
+	else:
+		cash_out_button.text = "Cash Out (+%d)" % total if total > 0 else "Cash Out"
+	_refresh_loadout_hud()
 
 func _set_pads_disabled(value: bool) -> void:
 	for pad_name in pads_by_name:
@@ -1993,6 +2848,7 @@ func _set_pads_disabled(value: bool) -> void:
 	# is playing back or during the round-clear pause, so it can't be tapped
 	# mid-animation into an inconsistent state.
 	cash_out_button.disabled = value
+	_refresh_loadout_hud()
 
 func _play_round_clear_beat() -> void:
 	_punch(round_label)

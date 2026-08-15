@@ -33,16 +33,11 @@ forgiveness perk is active).
   at the exact click position, plus a light screen-shake. A miss triggers a
   softer shake and a gentle amber screen flash (deliberately mellow, not a
   harsh "fail" sting, to keep the game feeling calm).
-- Every 3rd round, play pauses and offers a choice of 3 random **modifiers**
-  that stack for the rest of the run:
-
-  | Modifier | Effect |
-  |---|---|
-  | Sharper Ear | Combo multiplier grows faster per hit |
-  | Safety Net | Forgive your next mistake (stacks — multiple charges) |
-  | Golden Step | One extra step per round is worth 3x points |
-  | Steady Hands | Sequence plays back 15% slower |
-  | Resonance | +10% score on all hits |
+- Every 3rd round, play pauses and offers a choice of 3 random **modifiers**, drawn from a
+  24-strong roster across four categories (Multiplier, Defense, Tempo, Bonus-Event) — **one
+  equipped per category at a time**, Hades-style. Picking the modifier already in a slot levels it
+  up (1→5); picking a different one prompts a swap-or-skip choice instead of silently replacing or
+  stacking. Full roster and rationale: `docs/modifier-expansion.md`.
 
 ## Scales (tunings)
 
