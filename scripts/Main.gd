@@ -228,6 +228,23 @@ const ONBOARDING_STEPS := [
 	{"title": "Modifier Choices", "body": "Every 3rd round, pick one of three modifiers. Multiplier, Defense, Tempo, and Bonus-Event each get one equipped slot - picking the same one again levels it up, picking a new one swaps it in."},
 ]
 
+# FAQ panel copy - short, direct, a little playful. Built into a scrollable
+# list at runtime (_build_faq_content) rather than hand-laid-out in the
+# scene, same reasoning as everything else generated from data in this file.
+const FAQ_ENTRIES := [
+	{"q": "What is this?", "a": "A memory game - you know the one - rebuilt as a steel tongue drum. Watch a sequence, tap it back, don't miss."},
+	{"q": "Why did you build this?", "a": "Wanted a Simon clone that never punishes you for playing a \"wrong\" note, because on a real steel tongue drum there isn't one. Also wanted to see how far \"everything generated at runtime, zero imported assets\" could actually go. Pretty far, it turns out."},
+	{"q": "Do I need to know music theory?", "a": "No. Every starting scale is pentatonic, which is a fancy way of saying every note sounds fine next to every other note. Just play."},
+	{"q": "So I really can't hit a bad note?", "a": "You can miss a pad - wrong position in the sequence - but you can't pick an ugly-sounding one on a pentatonic scale. That guarantee is why the game opens on one and only lets the dissonant scales in later."},
+	{"q": "How does scoring work?", "a": "Points pile up in an unbanked pool while you play. Hit Cash Out whenever you want to lock them in - longer streak, bigger bonus - but a miss before you cash out forfeits whatever's still unbanked. Everything already banked is yours forever."},
+	{"q": "What are modifiers?", "a": "Every 3rd round you draft one. Four slots - Multiplier, Defense, Tempo, Bonus-Event - one modifier equipped per slot at a time. Picking the same one again levels it up (1 to 5); picking a different one swaps it in. 24 to find."},
+	{"q": "Normal, Chaos, Duet, Zen, Music - what's the difference?", "a": "Normal is the standard climb. Chaos reshuffles the pads and speeds up. Duet has the game play a phrase for you to echo back. Zen has no sequence or fail state, just noodling. Music plays itself - hands in your lap, just listen."},
+	{"q": "Is my progress saved?", "a": "Best score, round, and combo persist locally and unlock new scales/palettes/themes as you go. No account, no cloud - just a save file on your machine."},
+	{"q": "How's the audio made?", "a": "Synthesized at runtime, harmonics and all. There isn't a single audio file anywhere in this game. Same story for the two animated pad skins - shader math, not textures."},
+	{"q": "Is there a secret?", "a": "Maybe. Try typing something while you play."},
+	{"q": "I found a bug, or have feedback.", "a": "Genuinely useful, please say something. This is a small, actively-tinkered-with project - nothing's too minor to mention."},
+]
+
 @onready var background_rect: ColorRect = $Background
 @onready var resonator_panel: Panel = $Resonator
 @onready var pad_ring: Control = $PadRing
@@ -275,6 +292,10 @@ var palette_card_unlock_labels: Array[Label] = []
 
 @onready var help_button: Button = $HelpButton
 @onready var onboarding_panel: Control = $OnboardingPanel
+@onready var faq_button: Button = $FaqButton
+@onready var faq_panel: Control = $FaqPanel
+@onready var faq_qa_list: VBoxContainer = $FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ScrollContainer/QAList
+@onready var faq_close_button: Button = $FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/CloseButton
 @onready var onboarding_step_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/StepIndicatorLabel
 @onready var onboarding_title_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/TitleLabel
 @onready var onboarding_body_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/BodyLabel
@@ -471,6 +492,9 @@ func _ready() -> void:
 	onboarding_skip_button.pressed.connect(_on_onboarding_close_pressed)
 	onboarding_next_button.pressed.connect(_on_onboarding_next_pressed)
 	game_over_close_button.pressed.connect(_on_game_over_close_pressed)
+	faq_button.pressed.connect(_on_faq_button_pressed)
+	faq_close_button.pressed.connect(_on_faq_close_pressed)
+	_build_faq_content()
 	_connect_ui_clicks()
 	_setup_mix_sliders()
 	reduce_motion_check.button_pressed = reduce_motion
@@ -757,7 +781,7 @@ func _connect_ui_clicks() -> void:
 		settings_button, settings_close_button, settings_close_x_button, settings_reset_button,
 		settings_confirm_yes_button, settings_confirm_no_button,
 		help_button, onboarding_skip_button, onboarding_next_button,
-		game_over_close_button, cash_out_button,
+		game_over_close_button, cash_out_button, faq_button, faq_close_button,
 	]
 	ui_click_buttons.append_array(scale_buttons)
 	ui_click_buttons.append_array(palette_buttons)
@@ -794,6 +818,29 @@ func _on_settings_tab_changed(_tab: int) -> void:
 
 func _on_help_button_pressed() -> void:
 	_show_onboarding()
+
+func _build_faq_content() -> void:
+	for entry in FAQ_ENTRIES:
+		var block := VBoxContainer.new()
+		block.add_theme_constant_override("separation", 4)
+		var q := Label.new()
+		q.text = String(entry["q"])
+		q.add_theme_font_size_override("font_size", 15)
+		q.autowrap_mode = 2
+		block.add_child(q)
+		var a := Label.new()
+		a.text = String(entry["a"])
+		a.add_theme_font_size_override("font_size", 13)
+		a.modulate.a = 0.75
+		a.autowrap_mode = 2
+		block.add_child(a)
+		faq_qa_list.add_child(block)
+
+func _on_faq_button_pressed() -> void:
+	faq_panel.visible = true
+
+func _on_faq_close_pressed() -> void:
+	faq_panel.visible = false
 
 func _show_onboarding() -> void:
 	onboarding_step = 0
