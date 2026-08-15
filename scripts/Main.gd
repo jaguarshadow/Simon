@@ -164,14 +164,6 @@ const MUSIC_VOLUME := 0.4
 # so accenting step 0 accents the bar's downbeat.
 const MUSIC_ACCENT_DECAY := 5.0
 const MUSIC_ACCENT_VOLUME := 0.55
-const MODIFIERS := [
-	{"id": "sharper_ear", "icon": "♪", "title": "Sharper Ear", "desc": "Combo multiplier grows faster per hit"},
-	{"id": "safety_net", "icon": "❖", "title": "Safety Net", "desc": "Forgive your next mistake and show the correct pad (stacks)"},
-	{"id": "golden_step", "icon": "★", "title": "Golden Step", "desc": "One extra step per round is worth 3x points"},
-	{"id": "steady_hands", "icon": "⏱", "title": "Steady Hands", "desc": "Sequence plays back 15% slower"},
-	{"id": "resonance", "icon": "♦", "title": "Resonance", "desc": "+10% score on all hits"},
-]
-
 const SCALES := [
 	{"id": "d_minor_pentatonic", "name": "D Minor\nPentatonic", "tones": [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 440.0], "notes": ["D", "F", "G", "A", "C", "D", "F", "A"], "ring_order": [0, 2, 4, 1, 6, 3, 7, 5]},
 	{"id": "c_major_pentatonic", "name": "C Major\nPentatonic", "tones": [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], "notes": ["C", "D", "E", "G", "A", "C", "D", "E"], "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
@@ -381,10 +373,6 @@ var modifier_levels: Dictionary = {}
 # granted incrementally on level-up, spent during play; dormant (but not
 # lost) while their modifier is swapped out of its slot.
 var modifier_resource: Dictionary = {}
-var current_offer: Array = []
-# When a drafted pick would swap out a different modifier already filling
-# that category's slot, the choice pauses here awaiting confirmation.
-var pending_swap: Dictionary = {}
 
 # Pure per-level stat caches, recomputed by `_recompute_pure_modifier_stats()`
 # whenever equip/level state changes (cheap to recompute - unlike charges,
