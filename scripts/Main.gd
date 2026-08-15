@@ -233,17 +233,12 @@ const ONBOARDING_STEPS := [
 # scene, same reasoning as everything else generated from data in this file.
 const FAQ_ENTRIES := [
 	{"q": "What is this?", "a": "A memory game - you know the one - rebuilt as a steel tongue drum. Watch a sequence, tap it back, don't miss."},
-	{"q": "Why did you build this?", "a": "Wanted a Simon clone that never punishes you for playing a \"wrong\" note, because on a real steel tongue drum there isn't one. Also wanted to see how far \"everything generated at runtime, zero imported assets\" could actually go. Pretty far, it turns out."},
-	{"q": "Why does every note sound good together?", "a": "Every starting scale is pentatonic - five notes per octave, spaced so there's no dissonant pair anywhere in it. Real steel tongue drums are tuned this way for the same reason. No theory required, it's built into the tuning."},
+	{"q": "Why did you build this?", "a": "To practice with godot, other dev tools, and have fun."},
 	{"q": "How does Music Mode write its own songs?", "a": "Two generators, recomputed every bar. Rhythm comes from Bjorklund's algorithm, which spaces out N hits as evenly as possible across 16 steps - the same math behind a lot of real-world grooves. Melody is a random walk over the scale, biased so a step tends to keep going the same direction and a leap tends to reverse right after, because that's roughly how real melodies move."},
-	{"q": "So I really can't hit a bad note?", "a": "You can miss a pad - wrong position in the sequence - but you can't pick an ugly-sounding one on a pentatonic scale. That guarantee is why the game opens on one and only lets the dissonant scales in later."},
 	{"q": "How does scoring work?", "a": "Points pile up in an unbanked pool while you play. Hit Cash Out whenever you want to lock them in - longer streak, bigger bonus - but a miss before you cash out forfeits whatever's still unbanked. Everything already banked is yours forever."},
 	{"q": "What are modifiers?", "a": "Every 3rd round you draft one. Four slots - Multiplier, Defense, Tempo, Bonus-Event - one modifier equipped per slot at a time. Picking the same one again levels it up (1 to 5); picking a different one swaps it in. 24 to find."},
 	{"q": "Normal, Chaos, Duet, Zen, Music - what's the difference?", "a": "Normal is the standard climb. Chaos reshuffles the pads and speeds up. Duet has the game play a phrase for you to echo back. Zen has no sequence or fail state, just noodling. Music plays itself - hands in your lap, just listen."},
-	{"q": "Is my progress saved?", "a": "Best score, round, and combo persist locally and unlock new scales/palettes/themes as you go. No account, no cloud - just a save file on your machine."},
 	{"q": "How's the audio made?", "a": "Synthesized at runtime, harmonics and all. There isn't a single audio file anywhere in this game. Same story for the two animated pad skins - shader math, not textures."},
-	{"q": "Is there a secret?", "a": "Maybe. Try typing something while you play."},
-	{"q": "I found a bug, or have feedback.", "a": "Genuinely useful, please say something. This is a small, actively-tinkered-with project - nothing's too minor to mention."},
 ]
 
 @onready var background_rect: ColorRect = $Background
