@@ -2,6 +2,9 @@
 
 name: CI
 
+permissions:
+  contents: write
+
 env:
   GODOT_VERSION: 4.7.1
 
