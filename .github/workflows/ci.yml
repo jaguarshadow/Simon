@@ -3,7 +3,7 @@
 name: CI
 
 env:
-  GODOT_VERSION: 4.2.2
+  GODOT_VERSION: 4.7.1
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
     name: Web Export
     runs-on: ubuntu-latest
     container:
-      image: barichello/godot-ci:4.2.2
+      image: barichello/godot-ci:4.7.1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
