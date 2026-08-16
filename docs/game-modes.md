@@ -1,14 +1,16 @@
 # Game Modes
 
-Four modes, each entered via its own button and exited back to the same menu. See
+Five modes, each entered via its own button and exited back to the same menu. See
 [architecture.md](architecture.md) for the shared boolean-flag/cross-fade mechanics.
 
 ## Normal
 
 The baseline loop: `_next_round()` appends one random pad to `sequence`, plays it back
 (`_play_sequence`), then waits for the player to repeat it via `_on_pad_pressed`. A correct
-final hit chains into the next round; a wrong hit ends the run (`_game_over`) unless
-`mistake_charges > 0` (see [scoring-and-modifiers.md](scoring-and-modifiers.md)).
+final hit chains into the next round; a wrong hit ends the run (`_game_over`) unless a heart
+remains (`hearts > 0`, starting at `RUN_START_HEARTS`) or a defense modifier (Safety Net,
+Muffled Strike, Unbreakable, Grounding Resonance) forgives it - see
+[scoring-and-modifiers.md](scoring-and-modifiers.md).
 
 ## Chaos Mode
 

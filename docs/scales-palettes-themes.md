@@ -1,7 +1,8 @@
 # Scales, Palettes & Themes
 
-Three independent unlock tracks, all defined as data arrays (`SCALES`, `PALETTES`, `THEMES`) in
-`Main.gd`, and all unlocked the same generic way:
+Three independent unlock tracks, all defined as data arrays (`GameData.SCALES`,
+`GameData.PALETTES`, `GameData.THEMES` in `scripts/game_data.gd`), and all unlocked the same
+generic way:
 
 ```gdscript
 "unlock": {"type": "round" | "score" | "combo", "value": N}
@@ -19,7 +20,7 @@ function instead of three parallel systems.
 
 `GAME_OVERVIEW.md` originally treated Palette (pad color) as its own axis. `GAME_DESIGN.md`
 introduced Theme (whole-app mood) as a second, independent axis on top of it — but the current
-`THEMES` array comment says otherwise:
+`GameData.THEMES` array comment says otherwise:
 
 > Every theme carries its pad look directly as `pad_style`, so Theme is the only axis the player
 > chooses in Settings — there's no separate Palette picker to fall out of sync with it.
@@ -28,7 +29,7 @@ This is a deliberate simplification made during implementation: letting Theme an
 fully independently means `9 themes x 10 palettes` combinations to visually sanity-check, several
 of which (e.g. an animated shader palette under a theme also using a full-screen shader) fight
 each other. Folding palette choice into each theme's `pad_style` cuts that down to one coherent,
-curated look per theme, at the cost of losing free recombination. `PALETTES` still exists as a
+curated look per theme, at the cost of losing free recombination. `GameData.PALETTES` still exists as a
 standalone array (used by the legacy/flat palette rendering path), but the *player-facing*
 picker is themes-only.
 

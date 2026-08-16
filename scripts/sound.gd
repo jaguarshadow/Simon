@@ -32,6 +32,24 @@ const STRIKE_NOISE_SMOOTHING := 0.12
 # voice pool lets up to VOICE_POOL_SIZE notes ring concurrently while still
 # bounding total voices (the oldest slot gets stolen on the Nth+1 note).
 const VOICE_POOL_SIZE := 4
+
+# Stealing a still-ringing voice (5th+ concurrent note) used to hard-cut it
+# via stop()+play(), producing an audible click since the buffer was mid-
+# decay. A very short volume fade before the cut smooths that transition
+# without adding perceptible latency to the new note.
+const VOICE_STEAL_FADE_SEC := 0.008
+
+# Sample generation was previously one uninterrupted loop per note (up to
+# ~70,560 samples for a full-duration pad tone) - fast in absolute terms,
+# but still real synchronous CPU cost dumped into a single frame, worse on
+# Web export/low-end hardware (see the stutter this was already linked to).
+# Chunking spreads that cost across frames instead. 4096 samples (~93ms of
+# audio) per chunk generates roughly 5-6x faster than it's consumed at
+# 60fps, so the buffer stays comfortably ahead of playback (no audible
+# gaps) down to very low frame rates - this is a CPU-cost fix, not a
+# real-time-synthesis one; generation still finishes far ahead of the note
+# actually finishing playback.
+const SYNTH_CHUNK_SAMPLES := 4096
 var _voice_players: Array[AudioStreamPlayer] = []
 var _voice_generators: Array[AudioStreamGenerator] = []
 var _next_voice := 0
@@ -66,6 +84,13 @@ func _setup_buses() -> void:
 		AudioServer.add_bus(idx)
 		AudioServer.set_bus_name(idx, bus_name)
 		AudioServer.set_bus_send(idx, "Master")
+	# Up to VOICE_POOL_SIZE voices can ring concurrently by design (see the
+	# pool comment below); Godot sums bus inputs linearly, so several
+	# overlapping full-volume notes can sum past +-1.0 and hard-clip without
+	# this.
+	var tones_idx := AudioServer.get_bus_index("Tones")
+	if tones_idx != -1 and AudioServer.get_bus_effect_count(tones_idx) == 0:
+		AudioServer.add_bus_effect(tones_idx, AudioEffectLimiter.new())
 
 func set_bus_volume_linear(bus_name: String, volume: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
@@ -89,14 +114,24 @@ func play_ui_tick(freq := 660.0, volume := 0.22) -> void:
 	var mix_rate := _ui_generator.mix_rate
 	var duration := 0.18
 	var sample_count := int(mix_rate * duration)
-	for i in sample_count:
-		var t := float(i) / mix_rate
-		var envelope := exp(-14.0 * t)
-		var sample := 0.0
-		for h in HARMONICS:
-			sample += sin(TAU * freq * h[0] * t) * h[1]
-		sample *= volume * envelope
-		playback.push_frame(Vector2(sample, sample))
+	var i := 0
+	while i < sample_count:
+		var chunk_end: int = mini(i + SYNTH_CHUNK_SAMPLES, sample_count)
+		while i < chunk_end:
+			var t := float(i) / mix_rate
+			var envelope := exp(-14.0 * t)
+			var sample := 0.0
+			for h in HARMONICS:
+				sample += sin(TAU * freq * h[0] * t) * h[1]
+			sample *= volume * envelope
+			if not playback.push_frame(Vector2(sample, sample)):
+				push_warning("play_ui_tick: generator buffer full, dropping remaining samples")
+				return
+			i += 1
+		if i < sample_count:
+			if _ui_player.get_stream_playback() != playback:
+				return
+			await get_tree().process_frame
 
 func _start_ui_playback() -> AudioStreamGeneratorPlayback:
 	_ui_player.stop()
@@ -104,32 +139,61 @@ func _start_ui_playback() -> AudioStreamGeneratorPlayback:
 	return _ui_player.get_stream_playback() as AudioStreamGeneratorPlayback
 
 func _generate_harmonic(freq: float, duration: float, volume: float, decay_rate: float) -> void:
-	var playback := _start_playback()
+	var voice := await _start_playback()
+	var playback: AudioStreamGeneratorPlayback = voice["playback"]
 	if playback == null:
 		return
 	var mix_rate := 44100.0
 	var sample_count := int(mix_rate * duration)
 	var noise_samples := int(mix_rate * STRIKE_NOISE_DURATION)
 	var filtered_noise := 0.0
-	for i in sample_count:
-		var t := float(i) / mix_rate
-		var envelope := exp(-decay_rate * t)
-		var sample := 0.0
-		for h in HARMONICS:
-			var n: float = h[0]
-			var stretched_n := n * sqrt(1.0 + INHARMONICITY_B * n * n)
-			sample += sin(TAU * freq * stretched_n * t) * h[1]
-		if i < noise_samples:
-			var raw_noise := randf_range(-1.0, 1.0)
-			filtered_noise += (raw_noise - filtered_noise) * STRIKE_NOISE_SMOOTHING
-			var noise_envelope := exp(-t / (STRIKE_NOISE_DURATION * 0.3))
-			sample += filtered_noise * noise_envelope * STRIKE_NOISE_VOLUME
-		sample *= volume * envelope
-		playback.push_frame(Vector2(sample, sample))
+	var i := 0
+	while i < sample_count:
+		var chunk_end: int = mini(i + SYNTH_CHUNK_SAMPLES, sample_count)
+		while i < chunk_end:
+			var t := float(i) / mix_rate
+			var envelope := exp(-decay_rate * t)
+			var sample := 0.0
+			for h in HARMONICS:
+				var n: float = h[0]
+				var stretched_n := n * sqrt(1.0 + INHARMONICITY_B * n * n)
+				sample += sin(TAU * freq * stretched_n * t) * h[1]
+			if i < noise_samples:
+				var raw_noise := randf_range(-1.0, 1.0)
+				filtered_noise += (raw_noise - filtered_noise) * STRIKE_NOISE_SMOOTHING
+				var noise_envelope := exp(-t / (STRIKE_NOISE_DURATION * 0.3))
+				sample += filtered_noise * noise_envelope * STRIKE_NOISE_VOLUME
+			sample *= volume * envelope
+			if not playback.push_frame(Vector2(sample, sample)):
+				push_warning("_generate_harmonic: generator buffer full, dropping remaining samples")
+				return
+			i += 1
+		if i < sample_count:
+			if not _voice_is_current(voice):
+				return
+			await get_tree().process_frame
 
-func _start_playback() -> AudioStreamGeneratorPlayback:
+# Returns {"player":.., "playback":..} rather than just the playback so a
+# chunked generator (above) can later check _voice_is_current() and bail
+# out if this voice gets stolen by a new note mid-generation, instead of
+# wastefully finishing a buffer nobody will hear.
+func _start_playback() -> Dictionary:
 	var player := _voice_players[_next_voice]
 	_next_voice = (_next_voice + 1) % VOICE_POOL_SIZE
-	player.stop()
+	if player.playing:
+		await _fade_out_voice(player)
+	else:
+		player.stop()
 	player.play()
-	return player.get_stream_playback() as AudioStreamGeneratorPlayback
+	return {"player": player, "playback": player.get_stream_playback() as AudioStreamGeneratorPlayback}
+
+func _voice_is_current(voice: Dictionary) -> bool:
+	return voice["player"].get_stream_playback() == voice["playback"]
+
+func _fade_out_voice(player: AudioStreamPlayer) -> void:
+	var original_db := player.volume_db
+	var tween := create_tween()
+	tween.tween_property(player, "volume_db", original_db - 24.0, VOICE_STEAL_FADE_SEC)
+	await tween.finished
+	player.stop()
+	player.volume_db = original_db

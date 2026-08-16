@@ -141,14 +141,14 @@ Root, Healing Sounds, Cosmos Handpan, the Malte Marten Method, and The Sound Art
 below) to find patterns that are idiomatic to *this instrument* rather than generically
 "algorithmic." All six are now implemented in `_music_loop()`/`_generate_music_bar_melody()`.
 
-- **Anchor-note return (drone technique)** (`MUSIC_ANCHOR_RETURN_CHANCE` range, default 12%) -
+- **Anchor-note return (drone technique)** (`MUSIC_IDIOM_RANGES["anchor_return"]`, default 12%) -
   players weave back to the lowest/tonic pad *between* melodic notes, not just at phrase
   boundaries (mirrors a handpan's central "ding" used as a drone under a melody). Implemented as
   a small per-note chance, checked before each note's degree is chosen, of overriding the walk's
   next note to a resolution degree (tonic or in-range octave - see
   [Note distribution bias fix](#note-distribution-bias-fix) below) and resetting momentum, so the
   walk resumes cleanly from the anchor rather than carrying direction from before the jump.
-- **Zigzag / alternating-side contour** (`MUSIC_ZIGZAG_BIAS` range, default 0.75) - handpan note
+- **Zigzag / alternating-side contour** (`MUSIC_IDIOM_RANGES["zigzag_bias"]`, default 0.75) - handpan note
   layouts are numbered in a zigzag specifically so players alternate hands across the ring rather
   than run scalar sequences; it's a *physical* constraint that becomes a melodic signature. Pads
   are laid out on a ring via `ring_order`, so `_music_next_delta()` biases direction choice
@@ -164,10 +164,10 @@ below) to find patterns that are idiomatic to *this instrument* rather than gene
   playability rather than laid out by pitch. Notes are held long enough (90-160ms, decay 4.5) to
   actually ring as pitches and blend into each other - an earlier version used ~30ms blips with a
   fast decay (9.0) that read as electronic beeps rather than an instrument.
-- **Ghost notes** (`MUSIC_GHOST_NOTE_CHANCE` range, default 18%) - very light, near-silent filler
+- **Ghost notes** (`MUSIC_IDIOM_RANGES["ghost_notes"]`, default 18%) - very light, near-silent filler
   taps on the last-played pad, dropped into the Euclidean pattern's silent steps. Purely
   decorative - doesn't touch the melody walk's state at all.
-- **Groove repetition instead of always re-rolling** (`MUSIC_GROOVE_HOLD_CHANCE` range, default
+- **Groove repetition instead of always re-rolling** (`MUSIC_IDIOM_RANGES["groove_repeats"]`, default
   35%; hold length fixed at `MUSIC_GROOVE_HOLD_BARS = 2`) - tutorials teach practicing over a
   repeating 8-beat loop rather than constantly varying; after a bar's Euclidean rhythm is rolled,
   there's a chance to hold that same pattern for 2 more bars instead of re-rolling every bar
@@ -292,7 +292,7 @@ a magnet" kept substituting for "structurally important."
 
 **Fix:** `_scale_degree_weight()` computes each degree's semitone distance from the tonic directly
 from the scale's tuned frequencies (`12 * log2(tones[degree] / tones[0])`, not a hardcoded
-per-scale table, so it works for any scale definition in `SCALES`), and classifies it into the
+per-scale table, so it works for any scale definition in `GameData.SCALES`), and classifies it into the
 Krumhansl-Kessler tiers: 0 semitones (tonic, any octave) gets the highest weight
 (`MUSIC_DEGREE_WEIGHT_TONIC`), 3/4 semitones (minor/major third) or 7 semitones (perfect fifth)
 get the next tier (`MUSIC_DEGREE_WEIGHT_TRIAD`), and everything else (passing tones) is excluded

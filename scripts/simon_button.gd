@@ -38,8 +38,7 @@ func flash(duration := 0.4, decay_rate := 3.2, volume := 0.5) -> void:
 	_tween_glow_out()
 
 func set_shader_skin(shader: Shader, seed_offset: float) -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = shader
+	var mat := _material_for(shader)
 	mat.set_shader_parameter("seed", seed_offset)
 	_is_flat_shimmer = false
 	shader_material = mat
@@ -48,14 +47,24 @@ func set_shader_skin(shader: Shader, seed_offset: float) -> void:
 # Not literally "no shader" anymore - installs the shared flat-palette
 # shimmer, which is the default look for the 8 non-animated palettes.
 func clear_shader_skin() -> void:
-	var mat := ShaderMaterial.new()
-	mat.shader = FLAT_SHIMMER_SHADER
+	var mat := _material_for(FLAT_SHIMMER_SHADER)
 	mat.set_shader_parameter("seed", randf() * 10.0)
 	mat.set_shader_parameter("base_color", base_color)
 	mat.set_shader_parameter("lit_color", lit_color)
 	_is_flat_shimmer = true
 	shader_material = mat
 	material = mat
+
+# Reuses the existing material when it's already running the requested
+# shader (the common case: re-applying the same palette/theme, or a fresh
+# skin swap) instead of reallocating on every call; only allocates when
+# actually switching to a different shader.
+func _material_for(shader: Shader) -> ShaderMaterial:
+	if shader_material and shader_material.shader == shader:
+		return shader_material
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	return mat
 
 func _set_glow(value: float) -> void:
 	if _glow_tween:

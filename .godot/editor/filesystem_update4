@@ -1,2 +1,4 @@
 res://scripts/Main.gd
-res://scripts/simon_button.gd
+res://scripts/sound.gd
+res://scripts/save_manager.gd
+res://test/unit/test_save_manager.gd

@@ -25,6 +25,8 @@ driver/output_latency.web=100
 [autoload]
 
 Sound="*res://scripts/sound.gd"
+GameData="*res://scripts/game_data.gd"
+SaveManager="*res://scripts/save_manager.gd"
 
 [display]
 
@@ -35,6 +37,10 @@ window/stretch/mode="canvas_items"
 [dotnet]
 
 project/assembly_name="Simon"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
 
 [rendering]
 

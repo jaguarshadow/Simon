@@ -1,4 +1,5 @@
 extends Control
+class_name Main
 
 signal _modifier_picked(id: String)
 
@@ -10,18 +11,10 @@ const RING_CENTER := Vector2(400.0, 400.0)
 
 const MODIFIER_ROUND_INTERVAL := 3
 
-# --- Modifier slot system (docs/modifier-expansion.md) ---
-# One equipped modifier per category at a time. Picking a *different*
-# modifier into a filled slot prompts swap-or-skip; picking the *same*
-# modifier already equipped in its slot levels it up (1-5, capped).
-const MODIFIER_CATEGORIES := ["multiplier", "defense", "tempo", "bonus_event"]
-const CATEGORY_LABELS := {"multiplier": "Dynamics", "defense": "Grace", "tempo": "Phrasing", "bonus_event": "Ornament"}
-const CATEGORY_COLORS := {
-	"multiplier": Color(1.0, 0.78, 0.28),
-	"defense": Color(0.35, 0.82, 0.78),
-	"tempo": Color(0.62, 0.55, 0.98),
-	"bonus_event": Color(0.98, 0.48, 0.68),
-}
+# Shared pause before a call/round-clear beat plays out, giving the prior
+# action a beat to read before the next thing starts.
+const BEAT_PAUSE_SEC := 0.6
+
 const MAX_MODIFIER_LEVEL := 5
 
 # Musical chunking: sequences are built out of reused 3-note motifs some of
@@ -44,66 +37,6 @@ const RUBATO_HESITANT_RATIO := 1.35
 const RUBATO_CONFIDENT_RATIO := 0.75
 
 const FORTISSIMO_FANFARE_BONUS := 50
-
-const MODIFIERS := [
-	# --- Multiplier ---
-	{"id": "sharper_ear", "category": "multiplier", "icon": "♪", "title": "Sharper Ear", "desc": "Combo multiplier grows faster per hit", "power": false,
-		"levels": [{"combo_growth_bonus": 0.03}, {"combo_growth_bonus": 0.06}, {"combo_growth_bonus": 0.09}, {"combo_growth_bonus": 0.12}, {"combo_growth_bonus": 0.15}]},
-	{"id": "resonance", "category": "multiplier", "icon": "♦", "title": "Resonance", "desc": "Flat score bonus on all hits and cash-outs", "power": false,
-		"levels": [{"bonus": 0.04}, {"bonus": 0.08}, {"bonus": 0.12}, {"bonus": 0.16}, {"bonus": 0.20}]},
-	{"id": "crescendo", "category": "multiplier", "icon": "⟿", "title": "Crescendo", "desc": "Multiplier grows with waves completed this run", "power": false,
-		"levels": [{"per_wave": 0.05}, {"per_wave": 0.08}, {"per_wave": 0.12}, {"per_wave": 0.18}, {"per_wave": 0.25, "multiplicative": true}]},
-	{"id": "perfect_pitch", "category": "multiplier", "icon": "◎", "title": "Perfect Pitch", "desc": "Bonus for a smooth, even pace - fast or slow both count, only stopping and starting doesn't (matches the beat itself in Duet)", "power": false,
-		"levels": [{"bonus": 0.05, "tolerance": 0.18}, {"bonus": 0.08, "tolerance": 0.22}, {"bonus": 0.12, "tolerance": 0.26}, {"bonus": 0.16, "tolerance": 0.30}, {"bonus": 0.20, "tolerance": 0.35}]},
-	{"id": "harmonic_chain", "category": "multiplier", "icon": "⛓", "title": "Harmonic Chain", "desc": "Stacking bonus for consecutive hits within a motif", "power": false,
-		"levels": [{"increment": 0.02}, {"increment": 0.03}, {"increment": 0.04}, {"increment": 0.05}, {"increment": 0.06, "carry_across_chunks": true}]},
-	{"id": "fortissimo", "category": "multiplier", "icon": "✺", "title": "Fortissimo", "desc": "Multiplier once your streak passes your own best this run", "power": true,
-		"unlock": {"type": "waves", "value": 10, "text": "Survive 10 waves in one run"},
-		"levels": [{"margin": 3, "mult": 1.3}, {"margin": 2, "mult": 1.4}, {"margin": 1, "mult": 1.6}, {"margin": 0, "mult": 1.8}, {"margin": -1, "mult": 2.2, "fanfare": true}]},
-	# --- Defense ---
-	{"id": "safety_net", "category": "defense", "icon": "❖", "title": "Safety Net", "desc": "Forgives a miss for free, with a hint, whenever you're at or past your best streak this run", "power": false,
-		"levels": [{"grace": 0}, {"grace": 1}, {"grace": 2}, {"grace": 3}, {"grace": 4, "hint_notes": 2}]},
-	{"id": "echo_chamber", "category": "defense", "icon": "☍", "title": "Echo Chamber", "desc": "The correct pad softly echoes on its own when you hesitate", "power": false,
-		"levels": [{"hesitation_mult": 2.4}, {"hesitation_mult": 2.0}, {"hesitation_mult": 1.7}, {"hesitation_mult": 1.4}, {"hesitation_mult": 1.15, "peek_notes": 2}]},
-	{"id": "muffled_strike", "category": "defense", "icon": "◔", "title": "Muffled Strike", "desc": "Chance to forgive a fatal miss, growing the deeper into your streak you are", "power": false,
-		"levels": [{"chance": 0.10}, {"chance": 0.18}, {"chance": 0.28}, {"chance": 0.40}, {"chance": 0.55}]},
-	{"id": "grounding_resonance", "category": "defense", "icon": "≋", "title": "Grounding Resonance", "desc": "A fatal miss banks a % of your unbanked pool instead of losing it all", "power": false,
-		"levels": [{"pct": 0.10}, {"pct": 0.18}, {"pct": 0.25}, {"pct": 0.32}, {"pct": 0.40}]},
-	{"id": "second_wind", "category": "defense", "icon": "↺", "title": "Second Wind", "desc": "Cashing out refills a heart once your streak is long enough", "power": true,
-		"unlock": {"type": "flag", "key": "zero_miss_wave", "text": "Complete a wave with zero misses"},
-		"levels": [{"refill_streak": 8}, {"refill_streak": 6}, {"refill_streak": 4}, {"refill_streak": 2}, {"refill_streak": 1, "bonus_max_heart": true}]},
-	{"id": "unbreakable", "category": "defense", "icon": "⛨", "title": "Unbreakable", "desc": "The first miss each streak is forgiven free, retaining more of your combo the higher the level", "power": true,
-		"unlock": {"type": "flag", "key": "zero_miss_wave", "text": "Complete a wave with zero misses"},
-		"levels": [{"combo_retain_pct": 0.7}, {"combo_retain_pct": 0.78}, {"combo_retain_pct": 0.85}, {"combo_retain_pct": 0.92}, {"combo_retain_pct": 1.0}]},
-	# --- Tempo ---
-	{"id": "steady_hands", "category": "tempo", "icon": "⏱", "title": "Steady Hands", "desc": "Sequence plays back slower", "power": false,
-		"levels": [{"pct": 0.08}, {"pct": 0.15}, {"pct": 0.22}, {"pct": 0.30}, {"pct": 0.40}]},
-	{"id": "quick_rewind", "category": "tempo", "icon": "⏪", "title": "Quick Rewind", "desc": "Automatically replays the sequence when you're visibly stuck", "power": false,
-		"levels": [{"speed_mult": 6.0, "hesitation_mult": 3.2}, {"speed_mult": 4.5, "hesitation_mult": 2.8}, {"speed_mult": 3.5, "hesitation_mult": 2.4}, {"speed_mult": 2.5, "hesitation_mult": 2.0}, {"speed_mult": 1.8, "hesitation_mult": 1.7}]},
-	{"id": "constellation", "category": "tempo", "icon": "✷", "title": "Constellation", "desc": "Traces the sequence's shape across the ring as it plays, fading as your turn begins", "power": false,
-		"levels": [{"trail": 4}, {"trail": 7}, {"trail": 10}, {"trail": 14}, {"trail": 20}]},
-	{"id": "resonant_tones", "category": "tempo", "icon": "◈", "title": "Resonant Tones", "desc": "Chord tones (the tonic and fifth) ring out fuller and longer as the sequence plays", "power": false,
-		"levels": [{"extra_sec": 0.15}, {"extra_sec": 0.25}, {"extra_sec": 0.35}, {"extra_sec": 0.45}, {"extra_sec": 0.6}]},
-	{"id": "breath_mark", "category": "tempo", "icon": "❜", "title": "Breath Mark", "desc": "A slightly longer pause where a musical phrase actually ends", "power": false,
-		"levels": [{"pct": 0.10}, {"pct": 0.20}, {"pct": 0.32}, {"pct": 0.45}, {"pct": 0.60}]},
-	{"id": "rubato", "category": "tempo", "icon": "〜", "title": "Rubato", "desc": "Adaptive pacing: slows when you hesitate", "power": true,
-		"unlock": {"type": "combo", "value": 25, "text": "Reach a 25-combo in one run"},
-		"levels": [{"level": 1}, {"level": 2}, {"level": 3}, {"level": 4}, {"level": 5, "two_directional": true}]},
-	# --- Bonus-Event ---
-	{"id": "golden_step", "category": "bonus_event", "icon": "★", "title": "Golden Step", "desc": "Extra step(s) per round worth 3x points", "power": false,
-		"levels": [{"count": 1}, {"count": 2}, {"count": 3}, {"count": 4}, {"count": 5}]},
-	{"id": "double_down", "category": "bonus_event", "icon": "⚂", "title": "Double Down", "desc": "One flagged step per streak gambles the cash-out curve", "power": false,
-		"levels": [{"boost": 2}, {"boost": 3}, {"boost": 5}, {"boost": 7}, {"boost": 10, "chain": true}]},
-	{"id": "encore", "category": "bonus_event", "icon": "❢", "title": "Encore", "desc": "Cash-out replays the final phrase once more for a bonus", "power": false,
-		"levels": [{"pct": 0.50}, {"pct": 0.65}, {"pct": 0.80}, {"pct": 0.95}, {"pct": 1.10}]},
-	{"id": "lucky_strike", "category": "bonus_event", "icon": "✦", "title": "Lucky Strike", "desc": "Small chance of a surprise bonus-value pad each round", "power": false,
-		"levels": [{"chance": 0.05, "value_mult": 2.0}, {"chance": 0.09, "value_mult": 2.2}, {"chance": 0.14, "value_mult": 2.4}, {"chance": 0.20, "value_mult": 2.6}, {"chance": 0.28, "value_mult": 3.0}]},
-	{"id": "motif_bonus", "category": "bonus_event", "icon": "❦", "title": "Motif Bonus", "desc": "Flat bonus for correctly landing a full repeated motif", "power": false,
-		"levels": [{"amount": 15}, {"amount": 25}, {"amount": 40}, {"amount": 60}, {"amount": 90}]},
-	{"id": "grand_finale", "category": "bonus_event", "icon": "☀", "title": "Grand Finale", "desc": "Double or Nothing: wager the unbanked pool on completing one more round", "power": true,
-		"unlock": {"type": "flag", "key": "five_cashouts", "text": "Cash out 5 times in one run"},
-		"levels": [{"mult": 1.5}, {"mult": 1.8}, {"mult": 2.2}, {"mult": 2.7}, {"mult": 3.5, "insured": true}]},
-]
 
 # Wave-reset scoring escalation, player-triggered version: unlike the design
 # doc's original forced-cap-at-a-climbing-ceiling shape, there is no forced
@@ -302,91 +235,15 @@ const MUSIC_VOLUME := 0.4
 # so accenting step 0 accents the bar's downbeat.
 const MUSIC_ACCENT_DECAY := 5.0
 const MUSIC_ACCENT_VOLUME := 0.55
-const SCALES := [
-	{"id": "d_minor_pentatonic", "name": "D Minor\nPentatonic", "tones": [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 440.0], "notes": ["D", "F", "G", "A", "C", "D", "F", "A"], "ring_order": [0, 2, 4, 1, 6, 3, 7, 5]},
-	{"id": "c_major_pentatonic", "name": "C Major\nPentatonic", "tones": [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], "notes": ["C", "D", "E", "G", "A", "C", "D", "E"], "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "d_akebono", "name": "D Akebono", "tones": [293.66, 329.63, 349.23, 440.0, 466.16, 587.33, 659.25, 698.46], "notes": ["D", "E", "F", "A", "Bb", "D", "E", "F"], "ring_order": [0, 1, 6, 3, 2, 7, 4, 5]},
-	{"id": "d_minor", "name": "D Minor\nDiatonic", "tones": [146.83, 164.81, 174.61, 196.0, 220.0, 233.08, 261.63, 293.66], "notes": ["D", "E", "F", "G", "A", "Bb", "C", "D"], "unlock": {"type": "round", "value": 10}, "ring_order": [0, 3, 5, 2, 6, 1, 4, 7]},
-	{"id": "e_minor_pentatonic", "name": "E Minor\nPentatonic", "tones": [164.81, 196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0], "notes": ["E", "G", "A", "B", "D", "E", "G", "A"], "unlock": {"type": "round", "value": 5}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "g_major_pentatonic", "name": "G Major\nPentatonic", "tones": [196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0, 493.88], "notes": ["G", "A", "B", "D", "E", "G", "A", "B"], "unlock": {"type": "score", "value": 500}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "c_major_diatonic", "name": "C Major\nDiatonic", "tones": [130.81, 146.83, 164.81, 174.61, 196.0, 220.0, 246.94, 261.63], "notes": ["C", "D", "E", "F", "G", "A", "B", "C"], "unlock": {"type": "combo", "value": 15}, "ring_order": [0, 3, 1, 5, 2, 6, 4, 7]},
-	{"id": "chromatic_run", "name": "Chromatic\nRun", "tones": [130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.0, 196.0], "notes": ["C", "C#", "D", "D#", "E", "F", "F#", "G"], "unlock": {"type": "round", "value": 15}, "ring_order": [0, 4, 1, 6, 3, 7, 2, 5]},
-	{"id": "a_minor_pentatonic", "name": "A Minor\nPentatonic", "tones": [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33], "notes": ["A", "C", "D", "E", "G", "A", "C", "D"], "unlock": {"type": "round", "value": 25}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "a_akebono_pentatonic", "name": "A Akebono\nPentatonic", "tones": [220.0, 246.94, 261.63, 329.63, 349.23, 440.0, 493.88, 523.25], "notes": ["A", "B", "C", "E", "F", "A", "B", "C"], "unlock": {"type": "score", "value": 3000}, "ring_order": [0, 1, 6, 3, 2, 7, 4, 5]},
-	{"id": "e_major_pentatonic", "name": "E Major\nPentatonic", "tones": [164.81, 185.0, 207.65, 246.94, 277.18, 329.63, 369.99, 415.3], "notes": ["E", "F#", "G#", "B", "C#", "E", "F#", "G#"], "unlock": {"type": "combo", "value": 25}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-]
-
-const PALETTES := [
-	{"id": "anodized", "name": "Anodized", "hue_start": 0.0, "hue_end": 1.0, "wrap": true, "sat": 0.55, "val": 0.55, "lit_sat": 0.4, "lit_val": 1.0},
-	{"id": "pastel", "name": "Pastel Dream", "hue_start": 0.0, "hue_end": 1.0, "wrap": true, "sat": 0.35, "val": 0.78, "lit_sat": 0.25, "lit_val": 0.98},
-	{"id": "sunset", "name": "Sunset", "hue_start": 0.0, "hue_end": 0.13, "wrap": false, "sat": 0.65, "val": 0.6, "lit_sat": 0.5, "lit_val": 1.0},
-	{"id": "ocean", "name": "Ocean Steel", "hue_start": 0.48, "hue_end": 0.68, "wrap": false, "sat": 0.5, "val": 0.5, "lit_sat": 0.35, "lit_val": 0.95},
-	{"id": "monochrome_steel", "name": "Monochrome\nSteel", "hue_start": 0.6, "hue_end": 0.62, "wrap": false, "sat": 0.08, "val": 0.55, "lit_sat": 0.05, "lit_val": 0.95, "unlock": {"type": "round", "value": 5}},
-	{"id": "neon", "name": "Neon", "hue_start": 0.0, "hue_end": 1.0, "wrap": true, "sat": 0.85, "val": 0.95, "lit_sat": 0.7, "lit_val": 1.0, "unlock": {"type": "score", "value": 500}},
-	{"id": "forest", "name": "Forest", "hue_start": 0.25, "hue_end": 0.42, "wrap": false, "sat": 0.55, "val": 0.5, "lit_sat": 0.4, "lit_val": 0.9, "unlock": {"type": "combo", "value": 15}},
-	{"id": "royal", "name": "Royal", "hue_start": 0.7, "hue_end": 0.87, "wrap": false, "sat": 0.6, "val": 0.55, "lit_sat": 0.45, "lit_val": 0.95, "unlock": {"type": "round", "value": 15}},
-	{"id": "galaxy", "name": "Galaxy", "shader": "res://shaders/galaxy.gdshader", "accent_color": Color(0.55, 0.35, 0.85), "unlock": {"type": "round", "value": 20}},
-	{"id": "aurora", "name": "Aurora", "shader": "res://shaders/aurora.gdshader", "accent_color": Color(0.2, 0.85, 0.6), "unlock": {"type": "score", "value": 1500}},
-	{"id": "graphite_spectrum", "name": "Graphite\nSpectrum", "colors": [Color(0.263, 0.733, 0.655), Color(0.216, 0.730, 0.717), Color(0.211, 0.722, 0.773), Color(0.250, 0.710, 0.823), Color(0.313, 0.695, 0.863), Color(0.384, 0.676, 0.893), Color(0.457, 0.656, 0.912), Color(0.526, 0.635, 0.918)]},
-]
-
-# Every theme carries its pad look directly as pad_style, so Theme is the
-# only axis the player chooses in Settings - there's no separate Palette
-# picker to fall out of sync with it.
-const THEMES := [
-	{"id": "premium_minimal", "name": "Premium &\nMinimal", "bg": Color(0.046, 0.053, 0.060), "panel": Color(0.082, 0.092, 0.103), "border": Color(0.165, 0.181, 0.199), "text": Color(0.914, 0.923, 0.932), "text_muted": Color(0.520, 0.540, 0.561), "accent": Color(0.000, 0.767, 0.859), "accent2": Color(0.523, 0.673, 1.000)},
-	{"id": "cosmic_atmospheric", "name": "Cosmic &\nAtmospheric", "shader": "res://shaders/galaxy.gdshader", "resonator_color": Color(0.1, 0.08, 0.18, 1), "background_color": Color(0.02, 0.015, 0.05, 1), "bg": Color(0.039, 0.030, 0.085), "panel": Color(0.077, 0.066, 0.135), "border": Color(0.198, 0.181, 0.293), "text": Color(0.933, 0.931, 0.960), "text_muted": Color(0.595, 0.590, 0.644), "accent": Color(0.718, 0.526, 1.000), "accent2": Color(0.942, 0.438, 0.745), "unlock": {"type": "round", "value": 20},
-		"pad_style": {"shader": "res://shaders/galaxy.gdshader", "accent_color": Color(0.718, 0.526, 1.000)}},
-	{"id": "warm_tactile", "name": "Warm &\nTactile", "bg": Color(0.104, 0.082, 0.057), "panel": Color(0.157, 0.126, 0.091), "border": Color(0.253, 0.211, 0.164), "text": Color(0.949, 0.932, 0.913), "text_muted": Color(0.621, 0.592, 0.559), "accent": Color(0.791, 0.617, 0.199), "accent2": Color(0.921, 0.510, 0.481), "unlock": {"type": "round", "value": 3},
-		"pad_style": {"colors": [Color(0.854, 0.506, 0.534), Color(0.857, 0.511, 0.487), Color(0.854, 0.519, 0.442), Color(0.846, 0.529, 0.398), Color(0.832, 0.542, 0.358), Color(0.813, 0.557, 0.323), Color(0.789, 0.573, 0.296), Color(0.759, 0.591, 0.279)]}},
-	{"id": "playful_colorful", "name": "Playful &\nColorful", "bg": Color(0.956, 0.948, 0.919), "panel": Color(0.990, 0.987, 0.976), "border": Color(0.869, 0.858, 0.815), "text": Color(0.134, 0.123, 0.080), "text_muted": Color(0.402, 0.390, 0.340), "accent": Color(1.000, 0.412, 0.445), "accent2": Color(0.268, 0.646, 1.000), "unlock": {"type": "score", "value": 300},
-		"pad_style": {"colors": [Color(0.983, 0.425, 0.627), Color(0.992, 0.473, 0.201), Color(0.816, 0.613, 0.000), Color(0.437, 0.738, 0.225), Color(0.000, 0.780, 0.662), Color(0.000, 0.724, 0.973), Color(0.477, 0.606, 1.000), Color(0.808, 0.491, 0.944)]}},
-	{"id": "monochrome_noir", "name": "Monochrome\nNoir", "bg": Color(0.007, 0.007, 0.007), "panel": Color(0.028, 0.028, 0.028), "border": Color(0.141, 0.141, 0.141), "text": Color(0.961, 0.961, 0.961), "text_muted": Color(0.445, 0.445, 0.445), "accent": Color(0.703, 0.134, 0.158), "accent2": Color(0.806, 0.806, 0.806), "unlock": {"type": "combo", "value": 8},
-		"pad_style": {"colors": [Color(0.104, 0.104, 0.104), Color(0.189, 0.189, 0.189), Color(0.281, 0.281, 0.281), Color(0.378, 0.378, 0.378), Color(0.782, 0.293, 0.280), Color(0.585, 0.585, 0.585), Color(0.694, 0.694, 0.694), Color(0.806, 0.806, 0.806)]}},
-	{"id": "retro_arcade", "name": "Retro\nArcade", "bg": Color(0.008, 0.029, 0.012), "panel": Color(0.022, 0.064, 0.030), "border": Color(0.116, 0.230, 0.121), "text": Color(0.499, 0.926, 0.401), "text_muted": Color(0.316, 0.501, 0.275), "accent": Color(0.499, 0.926, 0.401), "accent2": Color(1.000, 0.669, 0.000), "unlock": {"type": "score", "value": 1000},
-		"pad_style": {"shader": "res://shaders/scanline.gdshader", "accent_color": Color(0.499, 0.926, 0.401)}},
-	{"id": "zen_garden", "name": "Zen\nGarden", "bg": Color(0.896, 0.916, 0.891), "panel": Color(0.953, 0.965, 0.950), "border": Color(0.787, 0.817, 0.781), "text": Color(0.112, 0.141, 0.106), "text_muted": Color(0.366, 0.401, 0.359), "accent": Color(0.420, 0.617, 0.460), "accent2": Color(0.320, 0.607, 0.694), "unlock": {"type": "round", "value": 8},
-		"pad_style": {"colors": [Color(0.636, 0.603, 0.403), Color(0.590, 0.619, 0.422), Color(0.541, 0.633, 0.453), Color(0.492, 0.644, 0.493), Color(0.446, 0.651, 0.539), Color(0.408, 0.654, 0.587), Color(0.385, 0.653, 0.634), Color(0.380, 0.647, 0.678)]}},
-	{"id": "raw_steel", "name": "Raw\nSteel", "bg": Color(0.099, 0.105, 0.111), "panel": Color(0.144, 0.151, 0.160), "border": Color(0.248, 0.262, 0.277), "text": Color(0.916, 0.922, 0.929), "text_muted": Color(0.551, 0.563, 0.575), "accent": Color(0.568, 0.629, 0.694), "accent2": Color(0.801, 0.454, 0.332), "unlock": {"type": "combo", "value": 20},
-		"pad_style": {"colors": [Color(0.456, 0.638, 0.624), Color(0.453, 0.636, 0.642), Color(0.454, 0.633, 0.660), Color(0.459, 0.629, 0.675), Color(0.467, 0.625, 0.689), Color(0.479, 0.620, 0.701), Color(0.493, 0.614, 0.710), Color(0.510, 0.608, 0.717)]}},
-	{"id": "solar_flare", "name": "Solar\nFlare", "bg": Color(0.091, 0.047, 0.040), "panel": Color(0.145, 0.087, 0.077), "border": Color(0.255, 0.177, 0.164), "text": Color(0.973, 0.940, 0.929), "text_muted": Color(0.608, 0.545, 0.533), "accent": Color(0.986, 0.353, 0.276), "accent2": Color(0.905, 0.625, 0.000), "unlock": {"type": "score", "value": 2500},
-		"pad_style": {"shader": "res://shaders/ember.gdshader", "accent_color": Color(0.986, 0.353, 0.276)}},
-]
-const DEFAULT_RESONATOR_COLOR := Color(0.35, 0.37, 0.4, 1)
-const DEFAULT_BACKGROUND_COLOR := Color(0.05, 0.05, 0.07, 1)
-
 const SAVE_PATH := "user://simon_save.json"
 const EASTER_EGG_CODE := "hubert"
-
-const ONBOARDING_STEPS := [
-	{"title": "Watch, Then Repeat", "body": "Each round, the pads flash a sequence of notes. Repeat it back by pressing the same pads in order - the sequence grows by one note every round you clear."},
-	{"title": "Score & Combo", "body": "Correct hits build a combo streak, which boosts your score multiplier. A forgiven miss halves your combo instead of wiping it out."},
-	{"title": "Cash Out Anytime", "body": "Your points build up as an unbanked streak total while you play. Tap Cash Out whenever you want to bank them - plus a bonus that grows the longer the streak ran - and start a fresh, short sequence. A miss before you cash out forfeits that streak's points, so bank when you don't want to risk it."},
-	{"title": "Five Ways to Play", "body": "Normal Mode is the standard growing sequence. Chaos reshuffles the pads and speeds up each round. Duet has the game play a short phrase for you to echo back exactly. Zen has no sequence or fail state - just play freely. Music plays itself for chill, hands-off listening."},
-	{"title": "Modifier Choices", "body": "Every 3rd round, pick one of three modifiers. Dynamics, Grace, Tempo, and Ornament each get one equipped slot - picking the same one again levels it up, picking a new one swaps it in."},
-]
-
-# FAQ panel copy - short, direct, a little playful. Built into a scrollable
-# list at runtime (_build_faq_content) rather than hand-laid-out in the
-# scene, same reasoning as everything else generated from data in this file.
-const FAQ_ENTRIES := [
-	{"q": "What is this?", "a": "A memory game, rebuilt as a steel tongue drum."},
-	{"q": "Why did you build this?", "a": "To practice with godot, other dev tools, and have fun."},
-	{"q": "How does Music Mode write its own songs?", "a": "Two generators, recomputed every bar. Rhythm comes from Bjorklund's algorithm, which spaces out N hits as evenly as possible across 16 steps - the same math behind a lot of real-world grooves. Melody is a random walk over the scale, biased so a step tends to keep going the same direction and a leap tends to reverse right after, because that's roughly how real melodies move - and each phrase quietly arcs upward then back down, the single most common shape in a 6000-song corpus study of folk melodies. On top of that walk sit six idioms borrowed from actual handpan/tongue-drum playing technique - drone returns to the tonic, a zigzag contour across the ring, glissando sweeps, ghost notes, groove repeats, and canonical riff shapes. Full writeup in docs/music-mode.md."},
-	{"q": "Why does the music favor some notes over others?", "a": "On purpose - real melodies lean on the tonic and its chord tones instead of spreading evenly across the scale (music-cognition researchers call this 'tonal hierarchy'), and the strong beat of every bar leans toward a chord tone too, the same way real melodies put stable notes on the downbeat and save the in-between tones for passing through. Getting the balance right took three rounds of tuning against real playback logs - the first two fixes looked plausible until the numbers said otherwise."},
-	{"q": "What do the sliders in Music Mode's Tune panel do?", "a": "Each of the six playing idioms above gets its own slider, defaulting to the middle (exactly the tuned amount that ships by default). Drag toward 0% to turn an idiom off, or toward 100% for a lot more of it. They're session-only - back to 50% every time you start Music Mode - and they don't touch Normal/Chaos Mode's sequence generation at all."},
-	{"q": "How does scoring work?", "a": "Points pile up in an unbanked pool while you play. Hit Cash Out whenever you want to lock them in - longer streak, bigger bonus - but a miss before you cash out forfeits whatever's still unbanked. Everything already banked is yours forever."},
-	{"q": "What are modifiers?", "a": "Every 3rd round you draft one. Four slots - Dynamics, Grace, Tempo, Ornament - one modifier equipped per slot at a time. Picking the same one again levels it up (1 to 5); picking a different one swaps it in. 24 to find."},
-	{"q": "Normal, Chaos, Duet, Zen, Music - what's the difference?", "a": "Normal is the standard climb. Chaos reshuffles the pads and speeds up. Duet has the game play a phrase for you to echo back. Zen has no sequence or fail state, just noodling. Music plays itself - hands in your lap, just listen."},
-	{"q": "How's the audio made?", "a": "Synthesized at runtime, harmonics and all. There isn't a single audio file anywhere in this game. Same story for the two animated pad skins - shader math, not textures."},
-]
 
 @onready var background_rect: ColorRect = $Background
 @onready var resonator_panel: Panel = $Resonator
 @onready var duet_ring: Control = $DuetRing
 @onready var constellation_layer: Control = $ConstellationLayer
 @onready var pad_ring: Control = $PadRing
-@onready var start_button: Button = $ModeBar/StartButton
+@onready var start_button: Button = %StartButton
 @onready var hearts_label: Label = $HeartsLabel
 @onready var round_label: Label = $RoundLabel
 @onready var combo_label: Label = $ComboLabel
@@ -394,71 +251,71 @@ const FAQ_ENTRIES := [
 @onready var cash_out_button: Button = $CashOutButton
 @onready var flash_overlay: ColorRect = $FlashOverlay
 @onready var modifier_panel: Control = $ModifierPanel
-@onready var modifier_vbox: Control = $ModifierPanel/CenterContainer/VBoxContainer
+@onready var modifier_vbox: Control = %VBoxContainer
 @onready var modifier_buttons: Array[Button] = [
-	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option1,
-	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option2,
-	$ModifierPanel/CenterContainer/VBoxContainer/OptionsRow/Option3,
+	%Option1,
+	%Option2,
+	%Option3,
 ]
 @onready var settings_button: Button = $SettingsButton
 @onready var settings_panel: Control = $SettingsPanel
-@onready var settings_scroll: Control = $SettingsPanel/CenterContainer/ContentBox
-@onready var settings_tabs: TabContainer = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer
-@onready var settings_panel_bg: PanelContainer = $SettingsPanel/CenterContainer/ContentBox/PanelBG
-@onready var scale_grid: GridContainer = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales/Margin/ScaleGrid
+@onready var settings_scroll: Control = %ContentBox
+@onready var settings_tabs: TabContainer = %TabContainer
+@onready var settings_panel_bg: PanelContainer = %PanelBG
+@onready var scale_grid: GridContainer = %ScaleGrid
 var scale_buttons: Array[Button] = []
 var scale_card_badges: Array[PanelContainer] = []
 var scale_card_notes_rows: Array[HBoxContainer] = []
 var scale_card_unlock_labels: Array[Label] = []
-@onready var theme_grid: GridContainer = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/ThemeCenterContainer/ThemeGrid
-@onready var palette_section: Control = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection
-@onready var palette_grid: GridContainer = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection/PaletteGrid
+@onready var theme_grid: GridContainer = %ThemeGrid
+@onready var palette_section: Control = %PaletteSection
+@onready var palette_grid: GridContainer = %PaletteGrid
 var palette_buttons: Array[Button] = []
 var theme_buttons: Array[Button] = []
 var theme_card_badges: Array[PanelContainer] = []
 var theme_card_unlock_labels: Array[Label] = []
 var palette_card_badges: Array[PanelContainer] = []
 var palette_card_unlock_labels: Array[Label] = []
-@onready var settings_close_button: Button = $SettingsPanel/CenterContainer/ContentBox/ButtonRow/CloseButton
-@onready var settings_close_x_button: Button = $SettingsPanel/CenterContainer/ContentBox/HeaderRow/CloseXButton
-@onready var settings_reset_button: Button = $SettingsPanel/CenterContainer/ContentBox/ButtonRow/ResetButton
-@onready var settings_confirm_row: HBoxContainer = $SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow
-@onready var settings_confirm_yes_button: Button = $SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow/ConfirmYesButton
-@onready var settings_confirm_no_button: Button = $SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow/ConfirmNoButton
-@onready var best_score_label: Label = $SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile/ValueLabel
-@onready var best_round_label: Label = $SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile/ValueLabel
-@onready var best_combo_label: Label = $SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile/ValueLabel
+@onready var settings_close_button: Button = %SettingsCloseButton
+@onready var settings_close_x_button: Button = %CloseXButton
+@onready var settings_reset_button: Button = %ResetButton
+@onready var settings_confirm_row: HBoxContainer = %ConfirmRow
+@onready var settings_confirm_yes_button: Button = %ConfirmYesButton
+@onready var settings_confirm_no_button: Button = %ConfirmNoButton
+@onready var best_score_label: Label = %ScoreTileValueLabel
+@onready var best_round_label: Label = %RoundTileValueLabel
+@onready var best_combo_label: Label = %ComboTileValueLabel
 
 @onready var help_button: Button = $HelpButton
 @onready var onboarding_panel: Control = $OnboardingPanel
 @onready var faq_button: Button = $FaqButton
 @onready var faq_panel: Control = $FaqPanel
-@onready var faq_qa_list: VBoxContainer = $FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ScrollContainer/QAList
-@onready var faq_close_button: Button = $FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/CloseButton
-@onready var onboarding_step_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/StepIndicatorLabel
-@onready var onboarding_title_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/TitleLabel
-@onready var onboarding_body_label: Label = $OnboardingPanel/CenterContainer/VBoxContainer/BodyLabel
-@onready var onboarding_skip_button: Button = $OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow/SkipButton
-@onready var onboarding_next_button: Button = $OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow/NextButton
+@onready var faq_qa_list: VBoxContainer = %QAList
+@onready var faq_close_button: Button = %FaqCloseButton
+@onready var onboarding_step_label: Label = %StepIndicatorLabel
+@onready var onboarding_title_label: Label = %TitleLabel
+@onready var onboarding_body_label: Label = %BodyLabel
+@onready var onboarding_skip_button: Button = %SkipButton
+@onready var onboarding_next_button: Button = %NextButton
 
 @onready var game_over_panel: Control = $GameOverPanel
-@onready var game_over_stats_label: Label = $GameOverPanel/CenterContainer/VBoxContainer/StatsLabel
-@onready var game_over_best_label: Label = $GameOverPanel/CenterContainer/VBoxContainer/BestLabel
-@onready var game_over_close_button: Button = $GameOverPanel/CenterContainer/VBoxContainer/CloseButton
+@onready var game_over_stats_label: Label = %StatsLabel
+@onready var game_over_best_label: Label = %BestLabel
+@onready var game_over_close_button: Button = %GameOverCloseButton
 
-@onready var reduce_motion_check: CheckBox = $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer/ReduceMotionCheck
+@onready var reduce_motion_check: CheckBox = %ReduceMotionCheck
 
 const MIX_BUSES := ["Master", "Tones", "UI"]
 const MIX_DEFAULTS := {"Master": 1.0, "Tones": 0.9, "UI": 0.5}
 @onready var mix_sliders: Dictionary = {
-	"Master": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow/Slider,
-	"Tones": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow/Slider,
-	"UI": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow/Slider,
+	"Master": %MasterSlider,
+	"Tones": %TonesSlider,
+	"UI": %UISlider,
 }
 @onready var mix_pct_labels: Dictionary = {
-	"Master": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow/PctLabel,
-	"Tones": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow/PctLabel,
-	"UI": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow/PctLabel,
+	"Master": %MasterPctLabel,
+	"Tones": %TonesPctLabel,
+	"UI": %UIPctLabel,
 }
 # Music Mode idiom sliders (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - each
 # controls how often one of the steel-tongue-drum idioms fires, as a 0..1
@@ -479,32 +336,32 @@ const MUSIC_IDIOM_RANGES := {
 	"riff_shapes": {"min": 0.0, "default": 0.25, "max": 0.6},
 }
 @onready var music_idiom_sliders: Dictionary = {
-	"anchor_return": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow/Slider,
-	"zigzag_bias": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow/Slider,
-	"groove_repeats": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow/Slider,
-	"ghost_notes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow/Slider,
-	"glissando": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow/Slider,
-	"riff_shapes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow/Slider,
+	"anchor_return": %AnchorSlider,
+	"zigzag_bias": %ZigzagSlider,
+	"groove_repeats": %GrooveSlider,
+	"ghost_notes": %GhostSlider,
+	"glissando": %GlissandoSlider,
+	"riff_shapes": %RiffSlider,
 }
 @onready var music_idiom_pct_labels: Dictionary = {
-	"anchor_return": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow/PctLabel,
-	"zigzag_bias": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow/PctLabel,
-	"groove_repeats": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow/PctLabel,
-	"ghost_notes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow/PctLabel,
-	"glissando": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow/PctLabel,
-	"riff_shapes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow/PctLabel,
+	"anchor_return": %AnchorPctLabel,
+	"zigzag_bias": %ZigzagPctLabel,
+	"groove_repeats": %GroovePctLabel,
+	"ghost_notes": %GhostPctLabel,
+	"glissando": %GlissandoPctLabel,
+	"riff_shapes": %RiffPctLabel,
 }
-@onready var zen_button: Button = $ModeBar/ZenButton
+@onready var zen_button: Button = %ZenButton
 @onready var zen_bar: Control = $ZenBar
-@onready var exit_zen_button: Button = $ZenBar/ExitZenButton
-@onready var chaos_button: Button = $ModeBar/ChaosButton
-@onready var music_button: Button = $ModeBar/MusicButton
+@onready var exit_zen_button: Button = %ExitZenButton
+@onready var chaos_button: Button = %ChaosButton
+@onready var music_button: Button = %MusicButton
 @onready var music_bar: Control = $MusicBar
-@onready var exit_music_button: Button = $MusicBar/ExitMusicButton
-@onready var music_tune_button: Button = $MusicBar/TuneButton
+@onready var exit_music_button: Button = %ExitMusicButton
+@onready var music_tune_button: Button = %TuneButton
 @onready var music_tune_panel: Control = $MusicTunePanel
-@onready var music_tune_close_button: Button = $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/CloseButton
-@onready var duet_button: Button = $ModeBar/DuetButton
+@onready var music_tune_close_button: Button = %MusicTuneCloseButton
+@onready var duet_button: Button = %DuetButton
 
 var pads_by_name: Dictionary = {}
 var pad_names: Array[String] = []
@@ -693,6 +550,7 @@ func _ready() -> void:
 	# first call onward (Chaos reshuffles, Normal/Music/Duet note walks, gold
 	# steps, modifier offers, everything that uses randi()/randf()/.shuffle()).
 	randomize()
+	_init_burst_pool()
 	_load_progress()
 	start_button.pressed.connect(_on_start_pressed.bind("normal"))
 	chaos_button.pressed.connect(_on_start_pressed.bind("chaos"))
@@ -789,10 +647,10 @@ func _style_pick_card(card: Button, active: bool, locked: bool, accent: Color, b
 
 # Cards are built here rather than hand-placed in the scene, same reasoning as
 # `_build_pads()` - 11 near-identical nodes are far less error-prone generated
-# from `SCALES` than hand-authored in the .tscn.
+# from `GameData.SCALES` than hand-authored in the .tscn.
 func _build_scale_cards() -> void:
-	for i in SCALES.size():
-		var scale: Dictionary = SCALES[i]
+	for i in GameData.SCALES.size():
+		var scale: Dictionary = GameData.SCALES[i]
 		var card := Button.new()
 		card.custom_minimum_size = Vector2(280, 108)
 		card.focus_mode = Control.FOCUS_NONE
@@ -862,8 +720,8 @@ func _build_scale_cards() -> void:
 		scale_card_unlock_labels.append(unlock_label)
 
 func _build_palette_and_theme_buttons() -> void:
-	for i in PALETTES.size():
-		var palette: Dictionary = PALETTES[i]
+	for i in GameData.PALETTES.size():
+		var palette: Dictionary = GameData.PALETTES[i]
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(0, 52)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -922,8 +780,8 @@ func _build_palette_and_theme_buttons() -> void:
 		row.add_child(unlock_label)
 		palette_card_unlock_labels.append(unlock_label)
 
-	for i in THEMES.size():
-		var theme_data: Dictionary = THEMES[i]
+	for i in GameData.THEMES.size():
+		var theme_data: Dictionary = GameData.THEMES[i]
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(196, 120)
 		btn.focus_mode = Control.FOCUS_NONE
@@ -1092,7 +950,7 @@ func _on_help_button_pressed() -> void:
 	_show_onboarding()
 
 func _build_faq_content() -> void:
-	for entry in FAQ_ENTRIES:
+	for entry in GameData.FAQ_ENTRIES:
 		var block := VBoxContainer.new()
 		block.add_theme_constant_override("separation", 4)
 		var q := Label.new()
@@ -1128,15 +986,15 @@ func _show_onboarding() -> void:
 	onboarding_panel.visible = true
 
 func _refresh_onboarding_step() -> void:
-	var step: Dictionary = ONBOARDING_STEPS[onboarding_step]
-	onboarding_step_label.text = "Step %d / %d" % [onboarding_step + 1, ONBOARDING_STEPS.size()]
+	var step: Dictionary = GameData.ONBOARDING_STEPS[onboarding_step]
+	onboarding_step_label.text = "Step %d / %d" % [onboarding_step + 1, GameData.ONBOARDING_STEPS.size()]
 	onboarding_title_label.text = step["title"]
 	onboarding_body_label.text = step["body"]
-	var is_last := onboarding_step == ONBOARDING_STEPS.size() - 1
+	var is_last := onboarding_step == GameData.ONBOARDING_STEPS.size() - 1
 	onboarding_next_button.text = "Start Playing" if is_last else "Next"
 
 func _on_onboarding_next_pressed() -> void:
-	if onboarding_step == ONBOARDING_STEPS.size() - 1:
+	if onboarding_step == GameData.ONBOARDING_STEPS.size() - 1:
 		_on_onboarding_close_pressed()
 		return
 	onboarding_step += 1
@@ -1173,7 +1031,7 @@ func _trigger_easter_egg() -> void:
 		_on_settings_button_pressed()
 
 func _play_unlock_fanfare() -> void:
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	for freq in scale["tones"]:
 		Sound.play_tone(freq, 0.4)
 		await get_tree().create_timer(0.06).timeout
@@ -1211,7 +1069,7 @@ func _build_loadout_hud() -> void:
 	loadout_hud.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	loadout_hud.position = Vector2(12, 156)
 	add_child(loadout_hud)
-	for cat in MODIFIER_CATEGORIES:
+	for cat in GameData.MODIFIER_CATEGORIES:
 		var chip := PanelContainer.new()
 		chip.custom_minimum_size = Vector2(128, 44)
 		# STOP (not IGNORE) so the chip actually receives hover events -
@@ -1231,10 +1089,10 @@ func _build_loadout_hud() -> void:
 		vbox.add_theme_constant_override("separation", 1)
 		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(vbox)
-		var cat_color: Color = CATEGORY_COLORS[cat]
+		var cat_color: Color = GameData.CATEGORY_COLORS[cat]
 		sb.border_color = Color(cat_color, 0.45)
 		var cat_lbl := Label.new()
-		cat_lbl.text = CATEGORY_LABELS[cat].to_upper()
+		cat_lbl.text = GameData.CATEGORY_LABELS[cat].to_upper()
 		cat_lbl.add_theme_font_size_override("font_size", 9)
 		cat_lbl.add_theme_color_override("font_color", cat_color)
 		cat_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1280,18 +1138,18 @@ func _refresh_loadout_hud() -> void:
 	if loadout_hud == null:
 		return
 	loadout_hud.visible = _loadout_hud_should_show()
-	for cat in MODIFIER_CATEGORIES:
+	for cat in GameData.MODIFIER_CATEGORIES:
 		var id: String = equipped_modifiers[cat]
 		var lbl: Label = loadout_slot_labels[cat]
 		var chip: PanelContainer = loadout_slot_panels[cat]
 		var sb: StyleBoxFlat = chip.get_theme_stylebox("panel")
-		var cat_color: Color = CATEGORY_COLORS[cat]
+		var cat_color: Color = GameData.CATEGORY_COLORS[cat]
 		if id == "":
 			lbl.text = "— empty —"
 			lbl.modulate.a = 0.5
 			sb.bg_color = Color(0.05, 0.05, 0.06, 0.75)
 			sb.border_color = Color(cat_color, 0.4)
-			chip.tooltip_text = "%s slot: no modifier equipped yet." % CATEGORY_LABELS[cat]
+			chip.tooltip_text = "%s slot: no modifier equipped yet." % GameData.CATEGORY_LABELS[cat]
 		else:
 			var mod := _mod_def(id)
 			# No resource-count suffix anymore (docs/modifier-audit.md rule
@@ -1374,14 +1232,27 @@ func _reset_pad_positions() -> void:
 		pad.rotation_degrees = slot["rotation"]
 		_position_label(pad_slot_order[i], slot["dir"])
 
+var _shader_cache: Dictionary = {}
+
+# The handful of shader-skinned palettes reuse the same few shader files
+# across all 8 pads and every theme switch - load() each once and reuse the
+# Shader resource instead of re-loading (and re-parsing) it every time.
+func _cached_shader(path: String) -> Shader:
+	if not _shader_cache.has(path):
+		var shader := load(path)
+		if shader == null:
+			push_error("Failed to load shader: %s" % path)
+		_shader_cache[path] = shader
+	return _shader_cache[path]
+
 func _pad_hue(i: int, palette: Dictionary) -> float:
 	if palette["wrap"]:
 		return palette["hue_start"] + float(i) / PAD_COUNT * (palette["hue_end"] - palette["hue_start"])
 	return lerp(float(palette["hue_start"]), float(palette["hue_end"]), float(i) / float(PAD_COUNT - 1))
 
 func _apply_scale_and_palette() -> void:
-	var scale: Dictionary = SCALES[current_scale_index]
-	var palette: Dictionary = THEMES[current_theme_index].get("pad_style", PALETTES[current_palette_index])
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
+	var palette: Dictionary = GameData.THEMES[current_theme_index].get("pad_style", GameData.PALETTES[current_palette_index])
 	var is_shader_palette: bool = palette.has("shader")
 	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
 	for i in PAD_COUNT:
@@ -1392,7 +1263,7 @@ func _apply_scale_and_palette() -> void:
 		if is_shader_palette:
 			pad.base_color = palette["accent_color"]
 			pad.lit_color = (palette["accent_color"] as Color).lightened(0.4)
-			pad.set_shader_skin(load(palette["shader"]), float(i) * 1.37 + randf() * 0.5)
+			pad.set_shader_skin(_cached_shader(palette["shader"]), float(i) * 1.37 + randf() * 0.5)
 		elif palette.has("colors"):
 			pad.clear_shader_skin()
 			pad.base_color = palette["colors"][i]
@@ -1430,7 +1301,7 @@ func _contrast_ratio(a: Color, b: Color) -> float:
 	return (lighter + 0.05) / (darker + 0.05)
 
 func _apply_theme() -> void:
-	var theme_data: Dictionary = THEMES[current_theme_index]
+	var theme_data: Dictionary = GameData.THEMES[current_theme_index]
 	theme = _build_ui_theme(theme_data)
 
 	var accent: Color = theme_data["accent"]
@@ -1469,7 +1340,7 @@ func _apply_theme() -> void:
 	resonator_sb.shadow_size = 10
 	resonator_panel.add_theme_stylebox_override("panel", resonator_sb)
 
-# Builds a full Godot Theme resource from a THEMES entry's 7 chrome colors and
+# Builds a full Godot Theme resource from a GameData.THEMES entry's 7 chrome colors and
 # assigns it to the whole scene tree via the root Control's `theme` property
 # (Godot cascades it to every descendant; per-node color overrides elsewhere -
 # e.g. the gold combo/best-callout labels - still win over this).
@@ -1632,11 +1503,11 @@ func _refresh_settings_content() -> void:
 	best_score_label.text = str(best_score)
 	best_round_label.text = str(best_round)
 	best_combo_label.text = str(best_combo)
-	var accent: Color = THEMES[current_theme_index]["accent"]
-	var accent_text: Color = THEMES[current_theme_index].get("accent_text", Color.BLACK)
-	var border: Color = THEMES[current_theme_index]["border"]
+	var accent: Color = GameData.THEMES[current_theme_index]["accent"]
+	var accent_text: Color = GameData.THEMES[current_theme_index].get("accent_text", Color.BLACK)
+	var border: Color = GameData.THEMES[current_theme_index]["border"]
 	for i in scale_buttons.size():
-		var unlocked := _is_unlocked(SCALES[i])
+		var unlocked := _is_unlocked(GameData.SCALES[i])
 		var active := unlocked and i == current_scale_index
 		scale_buttons[i].disabled = not unlocked
 		scale_card_notes_rows[i].visible = unlocked
@@ -1648,14 +1519,14 @@ func _refresh_settings_content() -> void:
 	# sense (and only appears) while Premium & Minimal is active.
 	palette_section.visible = current_theme_index == 0
 	for i in palette_buttons.size():
-		var unlocked := _is_unlocked(PALETTES[i])
+		var unlocked := _is_unlocked(GameData.PALETTES[i])
 		var active := unlocked and i == current_palette_index and current_theme_index == 0
 		palette_buttons[i].disabled = not unlocked
 		palette_card_unlock_labels[i].visible = not unlocked
 		_style_pick_badge(palette_card_badges[i], active, not unlocked, accent, accent_text)
 		_style_pick_card(palette_buttons[i], active, not unlocked, accent, border, 8)
 	for i in theme_buttons.size():
-		var unlocked := _is_unlocked(THEMES[i])
+		var unlocked := _is_unlocked(GameData.THEMES[i])
 		var active := unlocked and i == current_theme_index
 		theme_buttons[i].disabled = not unlocked
 		theme_card_unlock_labels[i].visible = not unlocked
@@ -1691,14 +1562,14 @@ func _slide_out_panel(panel: Control, content: Control, offset: Vector2, duratio
 	content.modulate.a = 1.0
 
 func _on_scale_button_pressed(index: int) -> void:
-	if not _is_unlocked(SCALES[index]):
+	if not _is_unlocked(GameData.SCALES[index]):
 		return
 	current_scale_index = index
 	_apply_scale_and_palette()
 	_on_settings_button_pressed()
 
 func _on_palette_button_pressed(index: int) -> void:
-	if not _is_unlocked(PALETTES[index]):
+	if not _is_unlocked(GameData.PALETTES[index]):
 		return
 	current_palette_index = index
 	_apply_scale_and_palette()
@@ -1706,7 +1577,7 @@ func _on_palette_button_pressed(index: int) -> void:
 	_on_settings_button_pressed()
 
 func _on_theme_button_pressed(index: int) -> void:
-	if not _is_unlocked(THEMES[index]):
+	if not _is_unlocked(GameData.THEMES[index]):
 		return
 	current_theme_index = index
 	_apply_theme()
@@ -1739,20 +1610,17 @@ func _on_reset_progress_pressed() -> void:
 	_show_toast("Progress Reset")
 
 func _load_progress() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
+	var data := SaveManager.read_dict(SAVE_PATH)
+	if data.is_empty():
 		return
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	var data: Variant = JSON.parse_string(file.get_as_text())
-	if typeof(data) != TYPE_DICTIONARY:
-		return
-	best_score = int(data.get("best_score", 0))
-	best_round = int(data.get("best_round", 0))
-	best_combo = int(data.get("best_combo", 0))
-	best_waves = int(data.get("best_waves", 0))
-	zero_miss_wave_achieved = bool(data.get("zero_miss_wave_achieved", false))
-	five_cashouts_achieved = bool(data.get("five_cashouts_achieved", false))
-	cheat_all_unlocked = bool(data.get("cheat_all_unlocked", false))
-	onboarding_seen = bool(data.get("onboarding_seen", false))
+	best_score = SaveManager.get_int(data, "best_score", 0)
+	best_round = SaveManager.get_int(data, "best_round", 0)
+	best_combo = SaveManager.get_int(data, "best_combo", 0)
+	best_waves = SaveManager.get_int(data, "best_waves", 0)
+	zero_miss_wave_achieved = SaveManager.get_bool(data, "zero_miss_wave_achieved", false)
+	five_cashouts_achieved = SaveManager.get_bool(data, "five_cashouts_achieved", false)
+	cheat_all_unlocked = SaveManager.get_bool(data, "cheat_all_unlocked", false)
+	onboarding_seen = SaveManager.get_bool(data, "onboarding_seen", false)
 	# Selected-id persistence for Palette and Theme (Theme mirrors Palette's
 	# schema per GAME_DESIGN.md 1.1/open-items: no separate "unlocked set" is
 	# stored for either - unlock state is derived fresh from best_round/
@@ -1762,21 +1630,20 @@ func _load_progress() -> void:
 	# is out of range or points at something no longer unlocked (e.g. after a
 	# Reset Progress on a different save, or a shortened array), so a corrupt
 	# or stale save can never select a locked/nonexistent entry on load.
-	var saved_palette_index := int(data.get("current_palette_index", 0))
-	if saved_palette_index >= 0 and saved_palette_index < PALETTES.size() and _is_unlocked(PALETTES[saved_palette_index]):
+	var saved_palette_index := SaveManager.get_int(data, "current_palette_index", 0)
+	if saved_palette_index >= 0 and saved_palette_index < GameData.PALETTES.size() and _is_unlocked(GameData.PALETTES[saved_palette_index]):
 		current_palette_index = saved_palette_index
-	var saved_theme_index := int(data.get("current_theme_index", 0))
-	if saved_theme_index >= 0 and saved_theme_index < THEMES.size() and _is_unlocked(THEMES[saved_theme_index]):
+	var saved_theme_index := SaveManager.get_int(data, "current_theme_index", 0)
+	if saved_theme_index >= 0 and saved_theme_index < GameData.THEMES.size() and _is_unlocked(GameData.THEMES[saved_theme_index]):
 		current_theme_index = saved_theme_index
 	var saved_mix: Variant = data.get("mix_levels", {})
 	if typeof(saved_mix) == TYPE_DICTIONARY:
 		for bus_name in MIX_BUSES:
-			mix_levels[bus_name] = float(saved_mix.get(bus_name, MIX_DEFAULTS[bus_name]))
-	reduce_motion = bool(data.get("reduce_motion", false))
+			mix_levels[bus_name] = SaveManager.get_float(saved_mix, bus_name, MIX_DEFAULTS[bus_name])
+	reduce_motion = SaveManager.get_bool(data, "reduce_motion", false)
 
 func _save_progress() -> void:
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	file.store_string(JSON.stringify({
+	SaveManager.write_dict(SAVE_PATH, {
 		"best_score": best_score,
 		"best_round": best_round,
 		"best_combo": best_combo,
@@ -1789,7 +1656,7 @@ func _save_progress() -> void:
 		"reduce_motion": reduce_motion,
 		"current_palette_index": current_palette_index,
 		"current_theme_index": current_theme_index,
-	}))
+	})
 
 func _register_best(round_reached: int, current_score: int, current_combo: int) -> void:
 	var prev_round := best_round
@@ -1818,12 +1685,21 @@ func _meets_requirement_values(req: Dictionary, round_val: int, score_val: int, 
 			return score_val >= int(req["value"])
 		"combo":
 			return combo_val >= int(req["value"])
+	# "waves"/"flag" unlocks have no "before this run" baseline threaded
+	# through here (only round/score/combo are passed from _register_best),
+	# so they can't be correctly diffed against a prior value. No entry in
+	# GameData.SCALES/GameData.PALETTES/GameData.THEMES uses these types today (only GameData.MODIFIERS does,
+	# which goes through _is_unlocked()/_meets_requirement() instead, not
+	# this diffing path) - if one ever does, this needs prev_waves/prev-flag
+	# values plumbed through _check_new_unlocks first. Warn loudly rather
+	# than silently mis-diffing the unlock-toast logic.
+	push_warning("_meets_requirement_values: unhandled requirement type '%s' - unlock-toast diffing will be wrong for this entry" % req["type"])
 	return true
 
 func _check_new_unlocks(prev_round: int, prev_score: int, prev_combo: int) -> void:
 	# Accumulated silently during play - surfaced once on the end-of-run
 	# summary rather than as a mid-run interruption (was too jarring).
-	for entry in SCALES + PALETTES + THEMES:
+	for entry in GameData.SCALES + GameData.PALETTES + GameData.THEMES:
 		if not entry.has("unlock"):
 			continue
 		var req: Dictionary = entry["unlock"]
@@ -1917,44 +1793,12 @@ func _on_exit_music_pressed() -> void:
 		_set_pads_disabled(true)
 	)
 
-# Euclidean rhythm (Bjorklund's algorithm): distributes `pulses` onsets as
-# evenly as possible across `steps`, e.g. E(3,8) -> 10010010. Standard
-# "fill two bucket lists, repeatedly fold the shorter into the longer"
-# construction.
+# Delegates to SequenceGenerator (sequence_generator.gd) - see that file
+# for the algorithm. Kept as a same-named wrapper (rather than rewriting
+# every call site to SequenceGenerator.euclidean_rhythm(...)) for the same
+# reason as ModifierSystem's wrappers.
 func _euclidean_rhythm(pulses: int, steps: int) -> Array[bool]:
-	if pulses <= 0:
-		var empty: Array[bool] = []
-		empty.resize(steps)
-		empty.fill(false)
-		return empty
-	if pulses >= steps:
-		var full: Array[bool] = []
-		full.resize(steps)
-		full.fill(true)
-		return full
-	var a: Array = []
-	for i in pulses:
-		a.append([true])
-	var b: Array = []
-	for i in steps - pulses:
-		b.append([false])
-	while b.size() > 1:
-		var m: int = min(a.size(), b.size())
-		var new_a: Array = []
-		for i in m:
-			new_a.append(a[i] + b[i])
-		var remainder_a: Array = a.slice(m)
-		var remainder_b: Array = b.slice(m)
-		a = new_a
-		b = remainder_a if not remainder_a.is_empty() else remainder_b
-	var flat: Array[bool] = []
-	for group in a:
-		for v in group:
-			flat.append(v)
-	for group in b:
-		for v in group:
-			flat.append(v)
-	return flat
+	return SequenceGenerator.euclidean_rhythm(pulses, steps)
 
 # One bar's worth of onsets for a Music Mode phrase - pulse count re-rolled
 # each call so successive bars don't feel mechanically identical.
@@ -1962,134 +1806,29 @@ func _generate_music_rhythm() -> Array[bool]:
 	var pulses := randi_range(MUSIC_PULSES_MIN, MUSIC_PULSES_MAX)
 	return _euclidean_rhythm(pulses, MUSIC_RHYTHM_STEPS)
 
-# Reflecting boundary (Xenakis's random-walk barrier technique - see
-# docs/music-mode.md): an out-of-range step bounces back into range by the
-# amount it overshot, rather than clamping to the edge value. Clamping was
-# forcing the walk to deterministically pick a single "safe" direction
-# whenever it stood on an edge with no established direction yet (e.g. every
-# game's opening note, always the tonic), which killed melodic variety right
-# where it mattered most. Reflection keeps direction fully random and still
-# guarantees real movement.
+# The tonal-hierarchy resolution math (reflect_degree/semitones_from_tonic/
+# scale_degree_weight/pick_resolution_degree/nearest_chord_tone_degree) and
+# its rationale (Krumhansl & Kessler probe-tone studies, the three rounds
+# of note-distribution bias fixes) now live in SequenceGenerator
+# (sequence_generator.gd) - see that file for the full writeup. Kept as
+# same-named wrappers here for the same reason as ModifierSystem's.
 func _reflect_degree(raw_target: int) -> int:
-	var reflected := raw_target
-	if reflected < 0:
-		reflected = -reflected
-	elif reflected > PAD_COUNT - 1:
-		reflected = (PAD_COUNT - 1) * 2 - reflected
-	return clampi(reflected, 0, PAD_COUNT - 1)
+	return SequenceGenerator.reflect_degree(raw_target)
 
-# Fix for a measured note-frequency bias (see docs/music-mode.md#note-
-# distribution-bias-fix). Round 1 (superseded) always resolved anchor-
-# return/phrase-end to degree 0 specifically - one edge of the walk's range,
-# not the middle - which is textbook random-walk "mean reversion": an
-# excursion away from a reset point gets cut short before it can reach the
-# far edge, so degree 0's *neighborhood* got over-visited. Splitting the
-# reset target across the tonic's every in-range octave fixed that lopsided
-# decay, but logged histograms of the "fixed" version were still uneven in a
-# musically wrong way: the b3 degree (F, adjacent to the tonic's two
-# reset points) consistently out-visited the 5th/dominant degree (A) 2-4x
-# over, even though real tonal melodies favor the dominant on par with the
-# tonic - see Krumhansl & Kessler's tonal-hierarchy probe-tone studies
-# (docs/music-mode.md#note-distribution-bias-fix has the full writeup and
-# sources). The walk had no concept of *which* degrees are musically
-# important - "close to a reset point" isn't the same thing as "structurally
-# stable" - so proximity to the tonic's magnets, not real tonal function,
-# was deciding what got favored.
-#
-# Round 2: resolution now targets any scale degree in the tonic triad
-# (tonic, third, fifth - identified generically via semitone distance from
-# the tonic, not hardcoded per scale), weighted by tonal-hierarchy tier
-# (tonic weighted highest, third/fifth next, passing tones excluded
-# entirely - resolving to an unstable degree would defeat the point of
-# "resolution"). This generalizes round 1: the tonic's octave is still in
-# the stable set (0 semitones from the tonic, same as the tonic itself) and
-# still gets the highest weight, but the dominant and mediant now get a
-# real, weighted share of resolution traffic instead of none.
-const MUSIC_DEGREE_WEIGHT_TONIC := 2.4
-const MUSIC_DEGREE_WEIGHT_TRIAD := 1.5
-# Round 3 (see docs/music-mode.md#note-distribution-bias-fix): round 2's
-# weighting was fair among stable degrees, but the *overall* histogram still
-# showed the mediant (F) beating the tonic (D) - traced to degree 0 being a
-# hard wall. `_reflect_degree()` means a boundary degree has exactly one
-# neighbor, so any stepwise departure from it is forced onto that single
-# neighbor 100% of the time (no coin flip), inflating whichever degree
-# happens to sit next to a wall regardless of its own tonal importance. An
-# interior instance of the same pitch class (e.g. degree 5, this scale's
-# other D) doesn't have that problem - stepwise departures from it split
-# across two neighbors like everywhere else. Discounting boundary degrees
-# relative to interior ones so resolution prefers the interior instance when
-# one exists (falling back to the boundary degree when it's the only option,
-# e.g. `chromatic_run`'s single, non-repeating tonic) removes the forced-
-# neighbor effect without touching the tonal-hierarchy tiering itself.
-const MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR := 0.4
-
-# Semitone distance from the tonic (degree 0), via the scale's actual tuned
-# frequencies rather than hardcoded per-scale music theory - works for any
-# scale definition in SCALES, including ones with unusual/non-diatonic
-# interval structure.
 func _semitones_from_tonic(degree: int, scale: Dictionary) -> int:
-	var tones: Array = scale.get("tones", [])
-	if tones.is_empty() or degree >= tones.size() or float(tones[0]) <= 0.0:
-		return 0
-	var ratio: float = float(tones[degree]) / float(tones[0])
-	var semitones := int(round(12.0 * log(ratio) / log(2.0))) % 12
-	return semitones + 12 if semitones < 0 else semitones
+	return SequenceGenerator.semitones_from_tonic(degree, scale)
 
-# Tonal-hierarchy weight for a degree: tonic (0 or 12 semitones - i.e. any
-# octave) highest, minor/major third (3-4 semitones) or perfect fifth
-# (7 semitones) next, everything else (passing tones - 2nds, 4ths, 6ths,
-# 7ths) excluded from resolution entirely (weight 0). Degrees at either edge
-# of the pad range (0 or PAD_COUNT-1) get discounted - see
-# MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR above.
 func _scale_degree_weight(degree: int, scale: Dictionary) -> float:
-	var semitones := _semitones_from_tonic(degree, scale)
-	var weight := 0.0
-	if semitones == 0:
-		weight = MUSIC_DEGREE_WEIGHT_TONIC
-	elif semitones == 3 or semitones == 4 or semitones == 7:
-		weight = MUSIC_DEGREE_WEIGHT_TRIAD
-	else:
-		return 0.0
-	if degree == 0 or degree == PAD_COUNT - 1:
-		weight *= MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR
-	return weight
+	return SequenceGenerator.scale_degree_weight(degree, scale)
 
 func _pick_resolution_degree(scale: Dictionary) -> int:
-	var weights: Array[float] = []
-	var total := 0.0
-	for d in PAD_COUNT:
-		var w := _scale_degree_weight(d, scale)
-		weights.append(w)
-		total += w
-	if total <= 0.0:
-		return 0
-	var r := randf() * total
-	for d in PAD_COUNT:
-		r -= weights[d]
-		if r <= 0.0:
-			return d
-	return PAD_COUNT - 1
+	return SequenceGenerator.pick_resolution_degree(scale)
 
 func _is_resolution_degree(degree: int, scale: Dictionary) -> bool:
-	return _scale_degree_weight(degree, scale) > 0.0
+	return SequenceGenerator.is_resolution_degree(degree, scale)
 
-# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-strong-
-# beats): standard tonal/counterpoint practice puts chord tones on strong
-# metrical positions and reserves passing tones for weak ones. Finds the
-# closest degree with a nonzero _scale_degree_weight() (a local nudge, not a
-# jump to a weighted-random one - see the call site in
-# _generate_music_bar_melody() for why).
 func _nearest_chord_tone_degree(degree: int, scale: Dictionary) -> int:
-	var best := degree
-	var best_dist := PAD_COUNT
-	for d in PAD_COUNT:
-		if _scale_degree_weight(d, scale) <= 0.0:
-			continue
-		var dist := absi(d - degree)
-		if dist < best_dist:
-			best_dist = dist
-			best = d
-	return best
+	return SequenceGenerator.nearest_chord_tone_degree(degree, scale)
 
 func _music_reset_walk() -> void:
 	# Random starting degree, not always the tonic - so each Music/Duet
@@ -2105,59 +1844,18 @@ func _music_reset_walk() -> void:
 	_music_degree_counts = {}
 	_music_notes_logged = 0
 
-# Biased random walk step: mostly stepwise motion, some repeats, occasional
-# leaps. Direction follows two documented melodic tendencies (Huron, "Sweet
-# Anticipation"; Narmour's implication-realization model) rather than an
-# arbitrary streak-count rule:
-# - step inertia: a stepwise move tends to be followed by another step in
-#   the same direction, not a reversal.
-# - post-skip reversal: a leap tends to be followed by stepwise motion back
-#   the other way, "filling the gap" it just opened.
+# Delegates to SequenceGenerator.walk_next_step() - see that file for the
+# algorithm and rationale. Fetches the current scale here since the static
+# version takes it explicitly rather than reading current_scale_index.
+func _walk_next_step(max_leap: int, repeat_streak: int, last_direction: int, last_was_leap: bool, current_degree: int, zigzag_bias: float, arch_direction: int) -> Dictionary:
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
+	return SequenceGenerator.walk_next_step(max_leap, repeat_streak, last_direction, last_was_leap, current_degree, scale, zigzag_bias, arch_direction)
+
 func _music_next_delta(max_leap: int) -> int:
-	var repeat_chance: float = BASE_REPEAT_CHANCE * pow(REPEAT_DECAY, float(_music_repeat_streak - 1))
-	var step_chance := (1.0 - repeat_chance) * STEP_TO_NON_REPEAT_RATIO
-	var r := randf()
-	var magnitude: int
-	if r < repeat_chance:
-		magnitude = 0
-	elif r < repeat_chance + step_chance:
-		magnitude = 1
-	else:
-		magnitude = randi_range(2, max_leap)
-	if magnitude == 0:
-		_music_last_was_leap = false
-		return 0
-	var direction: int
-	var is_gap_fill := false
-	if _music_last_was_leap and _music_last_direction != 0:
-		direction = -_music_last_direction
-		magnitude = 1
-		is_gap_fill = true
-	elif _music_last_direction != 0 and magnitude == 1:
-		direction = _music_last_direction if randf() < 0.70 else -_music_last_direction
-	else:
-		# No established scale-degree direction to defer to (session start,
-		# or right after a phrase-end/anchor-return reset) - bias toward
-		# whichever direction lands on the opposite side of the physical
-		# ring, rather than a flat coin flip, per the zigzag idiom.
-		var zigzag_bias := _music_idiom_value("zigzag_bias")
-		var current_side := _music_ring_side(_music_current_degree)
-		var plus_side := _music_ring_side(_reflect_degree(_music_current_degree + magnitude))
-		var minus_side := _music_ring_side(_reflect_degree(_music_current_degree - magnitude))
-		if plus_side != current_side and minus_side == current_side:
-			direction = 1 if randf() < zigzag_bias else -1
-		elif minus_side != current_side and plus_side == current_side:
-			direction = -1 if randf() < zigzag_bias else 1
-		else:
-			direction = 1 if randf() < 0.5 else -1
-	# Melodic arch (see docs/music-mode.md#melodic-arch) - not applied to a
-	# gap-fill reversal, since that's a hard contour rule (Narmour) the arch
-	# shouldn't second-guess.
-	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
-		direction = _music_arch_direction()
-	_music_last_direction = direction
-	_music_last_was_leap = magnitude >= 2
-	return direction * magnitude
+	var step := _walk_next_step(max_leap, _music_repeat_streak, _music_last_direction, _music_last_was_leap, _music_current_degree, _music_idiom_value("zigzag_bias"), _music_arch_direction())
+	_music_last_direction = step["direction"]
+	_music_last_was_leap = step["was_leap"]
+	return step["delta"]
 
 # Which way the phrase-level melodic arch wants the walk to move right now -
 # up through the first half of a phrase, down through the second half. See
@@ -2172,7 +1870,7 @@ func _music_arch_direction() -> int:
 func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	if pulse_count <= 0:
 		return []
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
 	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
 	var degrees: Array[int] = []
@@ -2242,7 +1940,7 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 # mapping _apply_scale_and_palette() already maintains - stays correct
 # across scale changes without any Music-Mode-specific retuning logic.
 func _music_pad_for_degree(degree: int) -> SimonButton:
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
 	var ring_pos: int = ring_order.find(degree)
 	if ring_pos == -1:
@@ -2252,12 +1950,7 @@ func _music_pad_for_degree(degree: int) -> SimonButton:
 # Which physical half of the ring a scale degree sits on, per the current
 # scale's ring_order - used for the zigzag contour bias, not for lookup.
 func _music_ring_side(degree: int) -> int:
-	var scale: Dictionary = SCALES[current_scale_index]
-	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
-	var ring_pos: int = ring_order.find(degree)
-	if ring_pos == -1:
-		return 0
-	return 0 if ring_pos < PAD_COUNT / 2 else 1
+	return SequenceGenerator.ring_side(degree, GameData.SCALES[current_scale_index])
 
 # Glissando sweep (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - a quick single-
 # direction run across every pad, played as a rare special event between
@@ -2266,7 +1959,7 @@ func _music_ring_side(degree: int) -> int:
 # ring is deliberately zigzagged for playability, so a ring-order sweep
 # jumps around in pitch rather than sliding, which read as random blips
 # instead of a glissando. Degree order is pitch-ascending (see the `tones`
-# arrays in SCALES), so this always slides smoothly up or down even though
+# arrays in GameData.SCALES), so this always slides smoothly up or down even though
 # it lights pads in their zigzagged physical positions on screen.
 func _music_glissando_sweep(step_duration: float) -> void:
 	var spacing: float = clampf(step_duration * MUSIC_GLISSANDO_SPACING_FRACTION, MUSIC_GLISSANDO_MIN_SPACING, MUSIC_GLISSANDO_MAX_SPACING)
@@ -2290,6 +1983,8 @@ func _music_glissando_sweep(step_duration: float) -> void:
 # actual numbers rather than ear/memory. Remove once the walk's balance is
 # confirmed one way or the other.
 func _music_log_degree(degree: int) -> void:
+	if not OS.is_debug_build():
+		return
 	_music_degree_counts[degree] = _music_degree_counts.get(degree, 0) + 1
 	_music_notes_logged += 1
 	if _music_notes_logged % MUSIC_LOG_INTERVAL == 0:
@@ -2301,7 +1996,7 @@ func _print_music_degree_distribution() -> void:
 		total += count
 	if total == 0:
 		return
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	var notes: Array = scale.get("notes", [])
 	var expected_pct := 100.0 / PAD_COUNT
 	var parts: Array[String] = []
@@ -2587,7 +2282,7 @@ func _cash_out_total() -> int:
 # truncated to 0 notes for Normal/Chaos, `duet_wave_round` zeroed for Duet)
 # while combo/combo_growth and all modifiers persist untouched.
 func _on_cash_out_button_pressed() -> void:
-	if zen_mode or music_mode or not accepting_input:
+	if zen_mode or music_mode or not accepting_input or _hesitation_assist_busy:
 		return
 	if grand_finale_pending:
 		return
@@ -2608,18 +2303,12 @@ func _on_cash_out_button_pressed() -> void:
 	waves_completed += 1
 	_register_wave_completed()
 	_try_second_wind_refill()
-	accepting_input = false
-	_set_pads_disabled(true)
-	if duet_mode:
-		duet_wave_round = 0
-	else:
-		sequence = sequence.slice(0, min(WAVE_RESET_LENGTH, sequence.size()))
-	_start_new_streak_modifier_state()
+	_reset_streak()
 	_update_score_labels()
 	_punch(score_label)
 	_spawn_score_popup(cash_out_button.global_position + cash_out_button.size / 2.0, "+%d" % total, Color(1, 0.85, 0.3))
 	if crescendo_delta > 0:
-		get_tree().create_timer(0.16).timeout.connect(_spawn_score_popup.bind(cash_out_button.global_position + cash_out_button.size / 2.0 + Vector2(-24, -22), "Crescendo +%d" % crescendo_delta, CATEGORY_COLORS["multiplier"]))
+		get_tree().create_timer(0.16).timeout.connect(_spawn_score_popup.bind(cash_out_button.global_position + cash_out_button.size / 2.0 + Vector2(-24, -22), "Crescendo +%d" % crescendo_delta, GameData.CATEGORY_COLORS["multiplier"]))
 	_flash_screen(Color(1, 0.85, 0.3, 0.22))
 	if fortissimo_new_best:
 		_show_toast("Personal-Best Fanfare! +%d" % FORTISSIMO_FANFARE_BONUS)
@@ -2675,13 +2364,7 @@ func _resolve_grand_finale_win() -> void:
 	_register_wave_completed()
 	_try_second_wind_refill()
 	grand_finale_pending = false
-	accepting_input = false
-	_set_pads_disabled(true)
-	if duet_mode:
-		duet_wave_round = 0
-	else:
-		sequence = sequence.slice(0, min(WAVE_RESET_LENGTH, sequence.size()))
-	_start_new_streak_modifier_state()
+	_reset_streak()
 	_update_score_labels()
 	_spawn_score_popup(cash_out_button.global_position, "Double! +%d" % payout, Color(1, 0.85, 0.3))
 	_flash_screen(Color(1, 0.85, 0.3, 0.3))
@@ -2699,13 +2382,7 @@ func _resolve_grand_finale_loss() -> void:
 		_show_toast("Nothing. Wager lost.")
 	unbanked_points = 0
 	grand_finale_pending = false
-	accepting_input = false
-	_set_pads_disabled(true)
-	if duet_mode:
-		duet_wave_round = 0
-	else:
-		sequence.clear()
-	_start_new_streak_modifier_state()
+	_reset_streak(true)
 	_update_score_labels()
 	_flash_screen(Color(1, 0.3, 0.5, 0.25) if not insured else Color(1, 1, 1, 0.2))
 	_next_round()
@@ -2792,54 +2469,16 @@ func _normal_reset_walk() -> void:
 
 # Normal Mode's per-round note pick. Independent state from Music/Duet's
 # walk (`_music_*` vars) since Normal's sequence is one continuously
-# growing phrase for the whole run, not a per-bar/per-round reset - same
-# step-inertia/post-skip-reversal bias as _music_next_delta (see
-# docs/music-mode.md), duplicated rather than shared so the three modes'
-# walks can't interfere with each other's state.
+# growing phrase for the whole run, not a per-bar/per-round reset - shares
+# the actual step algorithm with Music Mode via _walk_next_step() (fixed
+# NORMAL_ZIGZAG_BIAS instead of the player-tunable Music Mode slider - see
+# the NORMAL_ANCHOR_RETURN_CHANCE comment above), but keeps its own state so
+# the three modes' walks can't interfere with each other.
 func _normal_next_delta(max_leap: int) -> int:
-	var repeat_chance: float = BASE_REPEAT_CHANCE * pow(REPEAT_DECAY, float(_normal_repeat_streak - 1))
-	var step_chance := (1.0 - repeat_chance) * STEP_TO_NON_REPEAT_RATIO
-	var r := randf()
-	var magnitude: int
-	if r < repeat_chance:
-		magnitude = 0
-	elif r < repeat_chance + step_chance:
-		magnitude = 1
-	else:
-		magnitude = randi_range(2, max_leap)
-	if magnitude == 0:
-		_normal_last_was_leap = false
-		return 0
-	var direction: int
-	var is_gap_fill := false
-	if _normal_last_was_leap and _normal_last_direction != 0:
-		direction = -_normal_last_direction
-		magnitude = 1
-		is_gap_fill = true
-	elif _normal_last_direction != 0 and magnitude == 1:
-		direction = _normal_last_direction if randf() < 0.70 else -_normal_last_direction
-	else:
-		# Zigzag/alternating-side contour bias, same technique as
-		# _music_next_delta() but at the fixed NORMAL_ZIGZAG_BIAS default
-		# rather than the player-tunable Music Mode slider - see the
-		# NORMAL_ANCHOR_RETURN_CHANCE comment above.
-		var current_side := _music_ring_side(_normal_current_degree)
-		var plus_side := _music_ring_side(_reflect_degree(_normal_current_degree + magnitude))
-		var minus_side := _music_ring_side(_reflect_degree(_normal_current_degree - magnitude))
-		if plus_side != current_side and minus_side == current_side:
-			direction = 1 if randf() < NORMAL_ZIGZAG_BIAS else -1
-		elif minus_side != current_side and plus_side == current_side:
-			direction = -1 if randf() < NORMAL_ZIGZAG_BIAS else 1
-		else:
-			direction = 1 if randf() < 0.5 else -1
-	# Melodic arch, same technique as _music_next_delta() but keyed off
-	# sequence length instead of bar count, since Normal Mode has no bars -
-	# see docs/music-mode.md#melodic-arch.
-	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
-		direction = _normal_arch_direction()
-	_normal_last_direction = direction
-	_normal_last_was_leap = magnitude >= 2
-	return direction * magnitude
+	var step := _walk_next_step(max_leap, _normal_repeat_streak, _normal_last_direction, _normal_last_was_leap, _normal_current_degree, NORMAL_ZIGZAG_BIAS, _normal_arch_direction())
+	_normal_last_direction = step["direction"]
+	_normal_last_was_leap = step["was_leap"]
+	return step["delta"]
 
 # Which way the phrase-level melodic arch wants the walk to move right now -
 # up through the first half of a phrase, down through the second half.
@@ -2847,7 +2486,7 @@ func _normal_arch_direction() -> int:
 	return 1 if (sequence.size() % NORMAL_PHRASE_LENGTH) * 2 < NORMAL_PHRASE_LENGTH else -1
 
 func _normal_next_pad_name() -> String:
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
 	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
 	# Riff shape seeding, phrase start only (mirrors _generate_music_bar_melody
@@ -2949,7 +2588,7 @@ func _rubato_speed_factor() -> float:
 # palette), independent of Chaos's on-screen reshuffling.
 func _pad_is_chord_tone(pad_name: String) -> bool:
 	var i := int(pad_name.replace("pad_", ""))
-	var scale: Dictionary = SCALES[current_scale_index]
+	var scale: Dictionary = GameData.SCALES[current_scale_index]
 	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
 	if i < 0 or i >= ring_order.size():
 		return false
@@ -3006,7 +2645,7 @@ func _play_sequence() -> void:
 		var past_ceiling: float = maxf(0.0, float(n - MEMORY_SPAN_CEILING))
 		chaos_speed = clamp(1.0 - pre_ceiling * 0.02 - past_ceiling * 0.09, 0.5, 1.0)
 	var duration_scale := sequence_speed_multiplier * chaos_speed * _rubato_speed_factor()
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(BEAT_PAUSE_SEC).timeout
 	var call_start_ms := Time.get_ticks_msec()
 	_constellation_reset_for_new_call()
 	for i in sequence.size():
@@ -3031,7 +2670,7 @@ func _play_sequence() -> void:
 # uniform gaps like Normal/Chaos) so the call's timing is the thing the
 # player is meant to reproduce.
 func _play_duet_call() -> void:
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(BEAT_PAUSE_SEC).timeout
 	# Steady Hands/Rubato scale only the call's playback pacing here, not
 	# `duet_step_duration` itself - the response phase grades timing against
 	# the original tempo grid (`duet_pulse_times`), which must stay untouched.
@@ -3112,7 +2751,7 @@ func _run_duet_response() -> void:
 	accepting_input = false
 	_set_pads_disabled(true)
 	_play_round_clear_beat()
-	await get_tree().create_timer(0.6).timeout
+	await get_tree().create_timer(BEAT_PAUSE_SEC).timeout
 	if _current_round() % MODIFIER_ROUND_INTERVAL == 0:
 		await _offer_modifier_choice()
 	_next_round()
@@ -3315,7 +2954,7 @@ func _on_pad_pressed(pad_name: String) -> void:
 			accepting_input = false
 			_set_pads_disabled(true)
 			_play_round_clear_beat()
-			await get_tree().create_timer(0.6).timeout
+			await get_tree().create_timer(BEAT_PAUSE_SEC).timeout
 			if _current_round() % MODIFIER_ROUND_INTERVAL == 0:
 				await _offer_modifier_choice()
 			_next_round()
@@ -3356,13 +2995,7 @@ func _forfeit_streak_from_double_down() -> void:
 	_flash_screen(Color(1, 0.3, 0.5, 0.2))
 	unbanked_points = 0
 	double_down_boost_amount = 0
-	accepting_input = false
-	_set_pads_disabled(true)
-	if duet_mode:
-		duet_wave_round = 0
-	else:
-		sequence.clear()
-	_start_new_streak_modifier_state()
+	_reset_streak(true)
 	_update_score_labels()
 	_next_round()
 
@@ -3422,47 +3055,47 @@ func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.
 		var baseline_points := int(round(10.0 * baseline_multiplier * timing_multiplier))
 		var sharper_ear_delta := base_points - baseline_points
 		if sharper_ear_delta > 0:
-			popups.append({"text": "Sharper Ear +%d" % sharper_ear_delta, "color": CATEGORY_COLORS["multiplier"]})
+			popups.append({"text": "Sharper Ear +%d" % sharper_ear_delta, "color": GameData.CATEGORY_COLORS["multiplier"]})
 
 	var fortissimo_mult := _fortissimo_multiplier()
 	if fortissimo_mult > 1.0:
 		var before := points
 		points = int(round(float(points) * fortissimo_mult))
-		popups.append({"text": "Fortissimo +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+		popups.append({"text": "Fortissimo +%d" % (points - before), "color": GameData.CATEGORY_COLORS["multiplier"]})
 
 	var pitch_mult := _perfect_pitch_multiplier()
 	if pitch_mult > 1.0:
 		var before := points
 		points = int(round(float(points) * pitch_mult))
-		popups.append({"text": "Perfect Pitch +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+		popups.append({"text": "Perfect Pitch +%d" % (points - before), "color": GameData.CATEGORY_COLORS["multiplier"]})
 
 	if player_index in gold_indices:
 		var before := points
 		points *= 3
-		popups.append({"text": "Golden Step +%d" % (points - before), "color": CATEGORY_COLORS["bonus_event"]})
+		popups.append({"text": "Golden Step +%d" % (points - before), "color": GameData.CATEGORY_COLORS["bonus_event"]})
 
 	if player_index == lucky_strike_index:
 		var before := points
 		points = int(round(points * float(_mod_val("lucky_strike", "value_mult"))))
 		lucky_strike_index = -1
 		_show_toast("Lucky Strike!")
-		popups.append({"text": "Lucky Strike +%d" % (points - before), "color": CATEGORY_COLORS["bonus_event"]})
+		popups.append({"text": "Lucky Strike +%d" % (points - before), "color": GameData.CATEGORY_COLORS["bonus_event"]})
 
 	var chain_bonus := _harmonic_chain_bonus_points(points)
 	if chain_bonus != 0:
 		points += chain_bonus
-		popups.append({"text": "Harmonic Chain +%d" % chain_bonus, "color": CATEGORY_COLORS["multiplier"]})
+		popups.append({"text": "Harmonic Chain +%d" % chain_bonus, "color": GameData.CATEGORY_COLORS["multiplier"]})
 
 	if score_bonus_percent > 0.0:
 		var before := points
 		points = int(round(points * (1.0 + score_bonus_percent)))
-		popups.append({"text": "Resonance +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+		popups.append({"text": "Resonance +%d" % (points - before), "color": GameData.CATEGORY_COLORS["multiplier"]})
 
 	unbanked_points += points
 	if _completed_repeated_chunk(player_index) and equipped_modifiers["bonus_event"] == "motif_bonus":
 		var motif_bonus := int(_mod_val("motif_bonus", "amount"))
 		unbanked_points += motif_bonus
-		popups.append({"text": "Motif +%d" % motif_bonus, "color": CATEGORY_COLORS["bonus_event"]})
+		popups.append({"text": "Motif +%d" % motif_bonus, "color": GameData.CATEGORY_COLORS["bonus_event"]})
 
 	var cur_wave: int = _current_wave_length()
 	if cur_wave > best_streak_this_run:
@@ -3477,79 +3110,59 @@ func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.
 
 # --- Modifier slot system: data lookups ---
 
+# Thin delegates to ModifierSystem (modifier_system.gd) - the actual
+# lookup/draft/equip rules live there now, tested independent of this
+# Control. Kept as same-named wrappers here (rather than rewriting every
+# call site to `ModifierSystem.mod_val(modifier_levels, ...)`) since
+# equipped_modifiers/modifier_levels are read at ~40 other gameplay-flow
+# call sites across this file - genuinely moving that state ownership out
+# of Main would mean touching all of them, not just the modifier system.
 func _mod_def(id: String) -> Dictionary:
-	for mod in MODIFIERS:
-		if mod["id"] == id:
-			return mod
-	return {}
+	return ModifierSystem.mod_def(id)
 
 func _mod_level(id: String) -> int:
-	return int(modifier_levels.get(id, 0))
+	return ModifierSystem.mod_level(modifier_levels, id)
 
-# Reads a per-level numeric field for `id`. Defaults to the *current* level;
-# pass an explicit level (1-5) to preview a different one (used by the draft
-# panel to show what a level-up would grant).
 func _mod_val(id: String, key: String, level := -1, fallback: Variant = 0) -> Variant:
-	var lvl: int = level if level > 0 else _mod_level(id)
-	if lvl <= 0:
-		lvl = 1
-	var mod := _mod_def(id)
-	if mod.is_empty():
-		return fallback
-	var levels: Array = mod["levels"]
-	var idx: int = clampi(lvl, 1, levels.size()) - 1
-	return levels[idx].get(key, fallback)
+	return ModifierSystem.mod_val(modifier_levels, id, key, level, fallback)
 
 func _mod_category(id: String) -> String:
-	return String(_mod_def(id).get("category", ""))
+	return ModifierSystem.mod_category(id)
 
 # Pure (non-consumable) per-level stats - safe to fully recompute from
 # scratch any time equip/level state changes, unlike charges/uses which are
 # spent during play and must only ever be granted incrementally.
 func _recompute_pure_modifier_stats() -> void:
-	combo_growth = BASE_COMBO_GROWTH
-	score_bonus_percent = 0.0
-	var mult_id: String = equipped_modifiers["multiplier"]
-	if mult_id == "sharper_ear":
-		combo_growth += _mod_val(mult_id, "combo_growth_bonus")
-	elif mult_id == "resonance":
-		score_bonus_percent += _mod_val(mult_id, "bonus")
-
-	golden_step_count = 0
-	if equipped_modifiers["bonus_event"] == "golden_step":
-		golden_step_count = int(_mod_val("golden_step", "count"))
-
-	sequence_speed_multiplier = 1.0
-	if equipped_modifiers["tempo"] == "steady_hands":
-		sequence_speed_multiplier = 1.0 + float(_mod_val("steady_hands", "pct"))
-
-	quick_rewind_speed_mult = 0.0
-	breath_mark_pct = 0.0
-	rubato_level = 0
-	rubato_two_directional = false
-	var tempo_id: String = equipped_modifiers["tempo"]
-	match tempo_id:
-		"quick_rewind":
-			quick_rewind_speed_mult = float(_mod_val(tempo_id, "speed_mult"))
-		"breath_mark":
-			breath_mark_pct = float(_mod_val(tempo_id, "pct"))
-		"rubato":
-			rubato_level = _mod_level(tempo_id)
-			rubato_two_directional = bool(_mod_val(tempo_id, "two_directional"))
-
-	grounding_resonance_pct = 0.0
-	if equipped_modifiers["defense"] == "grounding_resonance":
-		grounding_resonance_pct = float(_mod_val("grounding_resonance", "pct"))
-
-	# Second Wind L5 raises the heart ceiling by 1 - recomputed here (not
-	# granted once) so swapping Second Wind out mid-run correctly drops the
-	# bonus max, clamping current hearts down with it if needed.
-	max_hearts = RUN_START_HEARTS
-	if equipped_modifiers["defense"] == "second_wind" and bool(_mod_val("second_wind", "bonus_max_heart")):
-		max_hearts = RUN_START_HEARTS + 1
-	hearts = mini(hearts, max_hearts)
+	var stats := ModifierSystem.recompute_pure_stats(equipped_modifiers, modifier_levels, hearts)
+	combo_growth = stats["combo_growth"]
+	score_bonus_percent = stats["score_bonus_percent"]
+	golden_step_count = stats["golden_step_count"]
+	sequence_speed_multiplier = stats["sequence_speed_multiplier"]
+	quick_rewind_speed_mult = stats["quick_rewind_speed_mult"]
+	breath_mark_pct = stats["breath_mark_pct"]
+	rubato_level = stats["rubato_level"]
+	rubato_two_directional = stats["rubato_two_directional"]
+	grounding_resonance_pct = stats["grounding_resonance_pct"]
+	max_hearts = stats["max_hearts"]
+	hearts = stats["hearts"]
 	_refresh_hearts_hud()
 	_update_score_labels()
+
+# Ends the current streak and prepares the board for the next one: shared
+# by every streak-ending path (cash out, Grand Finale win/loss, Double Down
+# forfeit). `clear_fully` picks between the two ways a streak's sequence
+# gets shortened - Duet ignores `sequence` entirely and resets its own
+# `duet_wave_round` instead.
+func _reset_streak(clear_fully: bool = false) -> void:
+	accepting_input = false
+	_set_pads_disabled(true)
+	if duet_mode:
+		duet_wave_round = 0
+	elif clear_fully:
+		sequence.clear()
+	else:
+		sequence = sequence.slice(0, min(WAVE_RESET_LENGTH, sequence.size()))
+	_start_new_streak_modifier_state()
 
 # Per-streak state: reset at run start and on every cash-out (a streak is
 # one growing sequence/phrase between resets).
@@ -3700,7 +3313,7 @@ func _build_modifier_card(button: Button, mod: Dictionary) -> void:
 	button.text = ""
 	var id: String = mod["id"]
 	var cat: String = mod["category"]
-	var cat_color: Color = CATEGORY_COLORS[cat]
+	var cat_color: Color = GameData.CATEGORY_COLORS[cat]
 	var cur_level := _mod_level(id)
 	var incumbent: String = equipped_modifiers[cat]
 	var status_text: String
@@ -3760,7 +3373,7 @@ func _build_modifier_card(button: Button, mod: Dictionary) -> void:
 	header.add_child(title_label)
 
 	var cat_label := Label.new()
-	cat_label.text = "%s%s" % [CATEGORY_LABELS[cat].to_upper(), "  ·  POWER" if mod["power"] else ""]
+	cat_label.text = "%s%s" % [GameData.CATEGORY_LABELS[cat].to_upper(), "  ·  POWER" if mod["power"] else ""]
 	cat_label.add_theme_font_size_override("font_size", 15)
 	cat_label.add_theme_color_override("font_color", cat_color)
 	cat_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3796,15 +3409,7 @@ func _build_modifier_card(button: Button, mod: Dictionary) -> void:
 	button.disabled = false
 
 func _offer_modifier_choice() -> void:
-	var pool: Array = []
-	for mod in MODIFIERS:
-		if _mod_level(mod["id"]) >= MAX_MODIFIER_LEVEL:
-			continue
-		if mod["power"] and not _is_unlocked(mod):
-			continue
-		pool.append(mod)
-	pool.shuffle()
-	current_offer = pool.slice(0, min(3, pool.size()))
+	current_offer = ModifierSystem.build_offer(modifier_levels, _is_unlocked)
 	for i in modifier_buttons.size():
 		if i >= current_offer.size():
 			modifier_buttons[i].visible = false
@@ -3836,30 +3441,27 @@ func _reveal_modifier_panel() -> void:
 
 func _on_modifier_button_pressed(index: int) -> void:
 	if index < current_offer.size():
+		for btn in modifier_buttons:
+			btn.disabled = true
 		_modifier_picked.emit(current_offer[index]["id"])
 
 # Routes a drafted pick: level-up (same id already equipped), direct equip
 # (empty slot), or swap-or-skip (a different id already fills that slot).
 func _resolve_modifier_pick(id: String) -> void:
-	var cat := _mod_category(id)
-	var incumbent: String = equipped_modifiers[cat]
-	if incumbent == id or incumbent == "":
+	if ModifierSystem.is_direct_equip(equipped_modifiers, id):
 		_apply_modifier_pick(id)
 		return
+	var incumbent: String = equipped_modifiers[ModifierSystem.mod_category(id)]
 	await _show_swap_or_skip_dialog(id, incumbent)
 
 func _apply_modifier_pick(id: String) -> void:
-	var cat := _mod_category(id)
-	var from_level := _mod_level(id)
-	var to_level: int = min(from_level + 1, MAX_MODIFIER_LEVEL)
-	equipped_modifiers[cat] = id
-	modifier_levels[id] = to_level
-	if id == "unbreakable" or id == "second_wind":
+	var result := ModifierSystem.apply_pick(equipped_modifiers, modifier_levels, id)
+	if result["reset_forgiveness"]:
 		unbreakable_forgiven_this_streak = 0
 	_recompute_pure_modifier_stats()
 	_refresh_loadout_hud()
-	var mod := _mod_def(id)
-	_show_toast("%s %s -> Lv.%d" % [mod["icon"], mod["title"], to_level])
+	var mod: Dictionary = result["mod"]
+	_show_toast("%s %s -> Lv.%d" % [mod["icon"], mod["title"], result["to_level"]])
 
 # Runtime-built confirm popup (same pattern as _show_toast/_spawn_score_popup
 # - no new scene nodes needed). Resolves once the player confirms or skips.
@@ -3877,7 +3479,7 @@ func _show_swap_or_skip_dialog(new_id: String, incumbent_id: String) -> void:
 	box.position -= Vector2(160, 90)
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color(0.08, 0.09, 0.1, 0.97)
-	sb.border_color = CATEGORY_COLORS[_mod_category(new_id)]
+	sb.border_color = GameData.CATEGORY_COLORS[_mod_category(new_id)]
 	sb.set_border_width_all(3)
 	sb.set_corner_radius_all(10)
 	sb.content_margin_left = 20
@@ -3890,7 +3492,7 @@ func _show_swap_or_skip_dialog(new_id: String, incumbent_id: String) -> void:
 	vbox.add_theme_constant_override("separation", 10)
 	box.add_child(vbox)
 	var label := Label.new()
-	label.text = "%s slot is filled by %s.\nSwap in %s, or keep %s?" % [CATEGORY_LABELS[_mod_category(new_id)], old_mod["title"], new_mod["title"], old_mod["title"]]
+	label.text = "%s slot is filled by %s.\nSwap in %s, or keep %s?" % [GameData.CATEGORY_LABELS[_mod_category(new_id)], old_mod["title"], new_mod["title"], old_mod["title"]]
 	label.autowrap_mode = 2
 	label.custom_minimum_size = Vector2(280, 0)
 	vbox.add_child(label)
@@ -4124,22 +3726,37 @@ func _spawn_score_popup_cascade(pos: Vector2, entries: Array[Dictionary]) -> voi
 		delay += 0.16
 		offset += Vector2(24, -22)
 
+# Scoring hits happen at a bounded, human-input-limited rate, but a fresh
+# CPUParticles2D allocation (plus a queue_free() timer) on every single one
+# is still avoidable churn - a small round-robin pool (same pattern as
+# sound.gd's voice pool) reuses a handful of pre-created nodes instead.
+const BURST_POOL_SIZE := 6
+var _burst_pool: Array[CPUParticles2D] = []
+var _next_burst := 0
+
+func _init_burst_pool() -> void:
+	for i in BURST_POOL_SIZE:
+		var particles := CPUParticles2D.new()
+		particles.emitting = false
+		particles.one_shot = true
+		particles.amount = 14
+		particles.lifetime = 0.5
+		particles.explosiveness = 1.0
+		particles.direction = Vector2.UP
+		particles.spread = 180.0
+		particles.initial_velocity_min = 80.0
+		particles.initial_velocity_max = 180.0
+		particles.gravity = Vector2(0, 300)
+		particles.scale_amount_min = 2.0
+		particles.scale_amount_max = 4.0
+		add_child(particles)
+		_burst_pool.append(particles)
+
 func _spawn_burst(pos: Vector2, color: Color) -> void:
-	var particles := CPUParticles2D.new()
-	particles.position = pos
+	var particles := _burst_pool[_next_burst]
+	_next_burst = (_next_burst + 1) % BURST_POOL_SIZE
 	particles.emitting = false
-	particles.one_shot = true
-	particles.amount = 14
-	particles.lifetime = 0.5
-	particles.explosiveness = 1.0
-	particles.direction = Vector2.UP
-	particles.spread = 180.0
-	particles.initial_velocity_min = 80.0
-	particles.initial_velocity_max = 180.0
-	particles.gravity = Vector2(0, 300)
-	particles.scale_amount_min = 2.0
-	particles.scale_amount_max = 4.0
+	particles.position = pos
 	particles.color = color
-	add_child(particles)
+	particles.restart()
 	particles.emitting = true
-	get_tree().create_timer(particles.lifetime + 0.1).timeout.connect(particles.queue_free)
