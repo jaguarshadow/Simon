@@ -27,9 +27,9 @@ actually runs today.
 
 Per `GAME_OVERVIEW.md`, sequence length only ever grows one step per round, and human working
 memory puts a real ceiling on how long a sequence can get before "challenging" becomes "physically
-unplayable" — Chaos Mode already runs into this with its speed-ramp clamp
-(`clamp(1.0 - float(sequence.size() - 1) * 0.05, 0.5, 1.0)`, floored at 2x speed for exactly this
-reason, see [game-modes.md](game-modes.md#chaos-mode)). Before this mechanic, there was no cap on
+unplayable" — Chaos Mode already runs into this with its speed-ramp clamp, floored at 2x speed for
+exactly this reason (now an inflected ramp keyed off `MEMORY_SPAN_CEILING`, see
+[game-modes.md](game-modes.md#chaos-mode)). Before this mechanic, there was no cap on
 `sequence.size()` at all beyond what a run's wrong-pad failure naturally imposes — score only ever
 grew by playing one ever-longer sequence until a miss ended the run outright, and `_register_hit`'s
 combo multiplier grows linearly, not compounding, specifically so scores don't blow past the Best
@@ -96,7 +96,7 @@ your points"). Score is now split into two pools:
 only — a fluky in-progress streak can't set a new best until it's actually banked, matching the
 "protection" spirit below.
 
-### Cash-out formula (as shipped)
+### Cash-out formula (as shipped, revised — see "Memory-research pass" below)
 
 ```gdscript
 func _current_wave_length() -> int:
@@ -105,10 +105,14 @@ func _current_wave_length() -> int:
 		return queued
 	return max(0, queued - 1)
 
+func _cash_out_base_bonus(s: int) -> float:
+	var beyond := maxf(0.0, float(s) - float(MEMORY_SPAN_CEILING))
+	return CASHOUT_LINEAR_K * float(s) + CASHOUT_QUADRATIC_K * beyond * beyond
+
 func _cash_out_streak_bonus() -> int:
 	var s := _current_wave_length()
 	var multiplier := 1.0 + float(combo - 1) * combo_growth
-	return int(round(CASHOUT_QUADRATIC_K * float(s) * float(s) * multiplier))
+	return int(round(_cash_out_base_bonus(s) * multiplier))
 ```
 
 `_next_round()` appends the new note (or increments `duet_wave_round`) *before* the player acts, so
@@ -117,13 +121,14 @@ and the button label all read `_current_wave_length()` instead, which stays on t
 length until a hit lands this round (`current_round_has_hit`). The round HUD's `(Streak N)` still
 shows the queued length — that's "what you're facing," not "what you've banked."
 
-`CASHOUT_QUADRATIC_K = 2.0` is a placeholder tuning constant — same by-eye/balance-pass status as
-the shimmer shader parameters and other numeric placeholders elsewhere in these docs, not a
-considered final value. The **quadratic-in-streak-length shape** is preserved from the original
-design intent (small early, dramatically larger late — the same "just one more step" tension
-push-your-luck games like Incan Gold lean on) even though the cap-relative framing
-(`bonus = k × cap(n) × (s/cap(n))²`) is gone; without a cap to normalize against, it's now a direct
-`k × s²`, uncapped in principle since `s` itself is uncapped.
+The bonus is **piecewise linear-then-quadratic, not a pure `s²`.** `MEMORY_SPAN_CEILING = 8` is a
+real research anchor (natural visual-sequence memory span), not a tuning guess. Below it the bonus grows
+linearly — a short, disciplined cash-out should feel calm and worthwhile, not like a rounding error
+next to a runaway curve. Past it, the quadratic term takes over, so the dramatic "just one more
+step" payout is reserved for the zone where the player is genuinely fighting the real memory
+handoff, which is also where push-your-luck tension is supposed to live. `CASHOUT_LINEAR_K = 16` /
+`CASHOUT_QUADRATIC_K = 10` were picked so both pieces agree exactly at the ceiling (`s=8` gives 128
+either way) rather than being two independently-guessed numbers.
 
 On cash-out (`_on_cash_out_button_pressed`): `score += unbanked_points + streak_bonus`;
 `unbanked_points` resets to `0`; the streak itself resets — `sequence` truncated to length 0 for
@@ -183,11 +188,11 @@ left for a forced-swap to pair with.
 
 ### What a miss costs (as shipped)
 
-A wrong pad press still behaves per the existing forgiveness rule (`mistake_charges`, see
-[scoring-and-modifiers.md](scoring-and-modifiers.md#mistake-forgiveness)) for whether the *run*
-ends. What changed is what a miss costs **beyond** that, following a direct design call from the
-user: *"protection from misses should also provide protection for points, otherwise what's the
-point?"*
+A wrong pad press still behaves per the existing forgiveness rule (superseded — see "Hearts" below;
+`scoring-and-modifiers.md#mistake-forgiveness` has the current mechanism) for whether the *run*
+ends. What changed here is what a miss costs **beyond** that, following a direct design call from
+the user: *"protection from misses should also provide protection for points, otherwise what's the
+point?"* — and that part is still exactly accurate, hearts or not.
 
 - **A forgiven miss (a `mistake_charges` charge is available) leaves `unbanked_points` completely
   untouched.** Safety Net and its future Defense-category siblings (`modifier-expansion.md`) now
@@ -204,6 +209,45 @@ This is a real behavioral change from the pre-cash-out game, where score was nev
 miss, forgiven or not (see [scoring-and-modifiers.md](scoring-and-modifiers.md#combosscore-math)
 for that older philosophy). The new rule only applies to the *unbanked* pool introduced by this
 mechanic — score that's already been cashed out is exactly as permanent as it always was.
+
+## Hearts: the memory-research pass
+
+Prompted by direct feedback: *"the whole idea is to gamble against yourself remembering the next
+sequence... but the game usually ends before you have a chance to cash out."* Every run started
+with **zero mistake forgiveness**, and Defense modifiers are only offered starting round 3
+(`MODIFIER_ROUND_INTERVAL`) — so the first 2 rounds of every single run were 100% lethal on any
+miss, regardless of build. Research (digit-span/visual-sequence-memory literature) says a 1-2 note
+sequence is trivially within anyone's memory span, so a miss that early is almost always a misclick,
+not a memory failure — yet it cost exactly as much as any other death, and cut the run short before
+the cash-out economy's actual tension (which research suggests lives around round 8-10, see
+`MEMORY_SPAN_CEILING` below) ever had a chance to matter.
+
+**Fix: `hearts`, a baseline, build-independent life pool.** Every run starts with
+`RUN_START_HEARTS = 3` hearts (`_on_start_pressed`). An ordinary miss with no Defense-modifier save
+now just spends a heart and continues (`_resolve_defense_on_miss()`) — the run only truly ends once
+hearts hit zero *and* no modifier save is available. Hearts are **run-scoped, not streak-scoped** —
+a cash-out resets the streak (sequence length, wave-round counters) but never touches hearts;
+nothing refills them by default.
+
+**Defense modifiers, reframed rather than obsoleted.** With a baseline everyone gets, the five
+Defense modifiers needed a real reason to still matter — the fix was making each one about *how
+efficiently* you spend the shared pool, not about being the only thing standing between a miss and
+game over:
+- **Safety Net / Unbreakable / Muffled Strike** — unchanged trigger conditions (territory / streak
+  position / combo-ramped probability, see `modifier-audit.md`), but now the effect is "this miss
+  costs no heart" instead of independently forgiving the miss.
+- **Grounding Resonance** — unchanged: still fires on the miss that actually ends the run (hearts
+  already at zero), banking a % of the unbanked pool.
+- **Second Wind** — fully re-scoped. Its old job (a true last-resort forced-cashout on an otherwise-
+  fatal miss) became redundant once hearts gave every build that cushion by default. Its new job:
+  refill a heart on a voluntary cash-out (or a Grand Finale win) once the streak is long enough
+  (`refill_streak`, shrinking by level — 8/6/4/2/1), capped at `max_hearts`. At L5 it also raises
+  `max_hearts` itself by 1 (`bonus_max_heart`) — a real power-tier payoff, and it ties Second Wind
+  directly into the cash-out habit the whole mechanic is trying to encourage, rather than being an
+  independent emergency valve.
+
+`HeartsLabel` (`scenes/Main.tscn`) shows the pool as filled/empty heart glyphs, refreshed by
+`_refresh_hearts_hud()` on every spend, refill, and modifier swap.
 
 ## Rejected: the forced wave-cap design
 
@@ -324,11 +368,10 @@ player *not* running that build starts noticing the cue unprompted, it's probabl
 
 ## Open items for implementation
 
-- **Exact `CASHOUT_QUADRATIC_K`** — the shipped value (`2.0`) is a placeholder, not a considered
-  balance pass. Needs real playtesting once the mechanic has had more hands-on time: does an
-  unbounded quadratic streak bonus stay sane at very long streaks, or does it need a soft ceiling
-  after all (a much later concern than the original per-wave cap, and voluntary/soft rather than
-  forced if it's ever added)?
+- **`CASHOUT_LINEAR_K`/`CASHOUT_QUADRATIC_K`** — now research-anchored at the ceiling (see above)
+  rather than a bare placeholder, but the two constants' exact values are still by-feel, unplaytested
+  at real long-streak lengths. Same open question as before: does an unbounded quadratic tail stay
+  sane at very long streaks, or does it need a soft ceiling after all?
 - **Fortissimo, Second Wind, Grand Finale, and Echo Chamber have all been redesigned** (a later
   pass, same session) — see `modifier-expansion.md` for the resolved mechanics. None of the roster
   is still designed against the rejected cap. The full 1-5 leveling system introduced in that same

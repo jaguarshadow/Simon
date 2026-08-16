@@ -20,7 +20,6 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 [audio]
 
-driver/output_latency=15
 driver/output_latency.web=100
 
 [autoload]

@@ -84,26 +84,38 @@ it would replace.
 ## Mistake forgiveness
 
 A wrong pad press routes through `_resolve_defense_on_miss()`, which checks whichever single
-Defense modifier is currently equipped (only one can be, per the slot system above) and returns
-one of three outcomes: `"forgiven_hint"` (Safety Net charges, Unbreakable's per-streak free misses,
-or a lucky Muffled Strike roll), `"forced_cashout"` (Second Wind: the run continues, hit points
-bank, the streak resets — not a full voluntary cash-out), or `"game_over"` (no Defense modifier
-equipped, or its resource is exhausted). `combo` is halved (not zeroed) on any forgiven outcome
-**and** on a Second Wind save, and the
-correct pad is flashed once (`_flash_miss_hint`, showing further-ahead notes too at Safety Net
-L5) before input returns to the player — a blind retry only helps when the miss was a fumble, not
-a forgotten note, so the hint is what makes the forgiveness actually usable rather than just
+Defense modifier is currently equipped (only one can be, per the slot system above) and returns one
+of two outcomes: `"forgiven_hint"` or `"game_over"`. As of the hearts baseline
+(`docs/scoring-escalation.md`'s "cash-out economy" pass), **`"game_over"` is no longer just "no
+Defense modifier fired"** — every run starts with `hearts = RUN_START_HEARTS` (3), and an ordinary
+miss with no modifier save just spends a heart and returns `"forgiven_hint"` too; `"game_over"` now
+only happens once hearts are already at zero. Safety Net (at/past your best streak this run),
+Unbreakable (the streak's first miss), and Muffled Strike (a live probability roll, ramping with
+combo) each make a save cost *no heart at all*, on top of that baseline, rather than being the only
+thing standing between a miss and the run ending. None of the three are gated by a countable
+resource (docs/modifier-audit.md rule 6) — each is a state check or a live roll, nothing to run out
+of. `combo` is normally halved on a forgiven miss (heart-spent or modifier-saved alike) — except
+Unbreakable, which retains a level-scaled fraction instead (`_combo_after_forgiveness()`, since only
+one Defense modifier is ever equipped, checking the slot is enough to know which one just fired).
+The correct pad is flashed once (`_flash_miss_hint`, showing further-ahead notes too at Safety Net
+L5) before input returns to the player — a blind retry only helps when the miss was a fumble, not a
+forgotten note, so the hint is what makes the forgiveness actually usable rather than just
 theoretical. Double Down's flagged gamble step and Grand Finale's Double-or-Nothing round (a wager
 on completing the rest of the round in progress, not a single note — see `modifier-expansion.md`)
 are deliberately routed *around* this function entirely — their misses are self-contained wagers,
-not normal sequence misses, and never consume a Defense resource.
+not normal sequence misses, and never touch the heart pool.
+
+Second Wind no longer intercepts misses at all — its job moved to the cash-out side: refilling a
+heart on a voluntary cash-out (or a Grand Finale win) once the streak's long enough
+(`refill_streak`, shrinking by level), capped at `max_hearts`. At L5 it also raises `max_hearts`
+itself by 1. `_try_second_wind_refill()` is called from `_on_cash_out_button_pressed()` and
+`_resolve_grand_finale_win()`, before either resets the streak.
 
 **Forgiveness protects points, not just the run.** Since cash-out (above) introduced a real
 at-risk pool (`unbanked_points`), a direct design call was made: *"protection from misses should
 also provide protection for points, otherwise what's the point?"* The forgiveness branch never
-touches score — so any `"forgiven_hint"` outcome leaves the entire current streak's unbanked value
-untouched, with no extra code needed to make that true (this is also why Muffled Strike's
-documented "L5 also protects points" doesn't need special-case code — it was already universally
-true of every forgiven outcome; see `docs/modifier-expansion.md`'s implementation note on that
-entry). Only a true `"game_over"` outcome forfeits the unbanked pool, and only because it was never
-in `score` to begin with — `_game_over`'s `final_score` reads `score` (banked-only).
+touches score — so any `"forgiven_hint"` outcome (heart-spent or modifier-saved) leaves the entire
+current streak's unbanked value untouched, with no extra code needed to make that true. Only a true
+`"game_over"` outcome (hearts already at zero, no save available) forfeits the unbanked pool, and
+only because it was never in `score` to begin with — `_game_over`'s `final_score` reads `score`
+(banked-only).

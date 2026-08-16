@@ -11,8 +11,10 @@ just read); they're the reasoning that isn't visible from the code alone.
 - [audio.md](audio.md) — procedural synthesis, buses, the ambient layer
 - [music-mode.md](music-mode.md) — the generative Euclidean-rhythm + melody-walk system, in depth
 - [modifier-expansion.md](modifier-expansion.md) — 24-modifier roster, slot system, leveling curves
+- [modifier-audit.md](modifier-audit.md) — usefulness pass over the roster: verdicts + redesign proposals
 - [scoring-escalation.md](scoring-escalation.md) — cash-out economy, wave/streak reset, what persists
 - [deployment.md](deployment.md) — how the GitHub Pages build/deploy pipeline works
+- [round-goals-and-big-numbers.md](round-goals-and-big-numbers.md) — proposal: bounded round goals replacing voluntary Cash Out, plus compounding/Balatro-style scoring
 
 Two documents outside `/docs` are the source of truth for scope:
 - `GAME_OVERVIEW.md` — the frozen core design (rules, modes, scoring, scales, palettes)

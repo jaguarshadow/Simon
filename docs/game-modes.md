@@ -16,10 +16,14 @@ Same rules as Normal, plus two changes, both gated on `chaos_mode`:
 - `_reshuffle_pad_positions()` runs every round — pads keep their tuning (see
   [architecture.md](architecture.md#two-separate-identity-systems-for-a-pad)) but move to new
   ring slots, forcing the player to find pads by color/note rather than muscle memory.
-- Playback speeds up with round count, but is clamped:
-  `clamp(1.0 - float(sequence.size() - 1) * 0.05, 0.5, 1.0)`. The floor at `0.5` (never faster
-  than 2x) exists because an uncapped ramp eventually turns "challenging" into "physically
-  can't react in time," which is a difficulty cliff, not difficulty.
+- Playback speeds up with round count, floored at `0.5` (never faster than 2x) because an uncapped
+  ramp eventually turns "challenging" into "physically can't react in time," which is a difficulty
+  cliff, not difficulty. The ramp itself now inflects at `MEMORY_SPAN_CEILING` (a real natural
+  visual-sequence memory span, ~8 items, not a by-feel number) instead of climbing at one flat rate
+  the whole way: gentle before it (still "normal" memory territory), steeper past it (the same real
+  cliff the cash-out bonus formula is built around — see the cash-out formula section of
+  [scoring-escalation.md](scoring-escalation.md)), reaching the floor a little sooner than the old
+  flat ramp did.
 
 ## Zen Mode
 
@@ -60,9 +64,17 @@ Two things deliberately differ from Normal Mode:
 - **Timing affects score, not just pass/fail.** Note *identity* still gates success exactly like
   Normal Mode (wrong pad, or no press within a generous flat grace window, behaves like a miss -
   forgiven by Safety Net charges or ends the run). Timing *accuracy* only scales the points a
-  correct hit is worth (`_register_hit`'s `timing_multiplier`): within 60ms of the expected beat
-  is "tight" (1.5x), within 150ms is "good" (1.0x), anything looser is still accepted but scores
-  at 0.5x. Deliberately never a fail condition of its own - sloppy timing costs points, not the run.
+  correct hit is worth (`_register_hit`'s `timing_multiplier`), and does so continuously rather
+  than in tiers: 1.5x exactly on the beat, falling off smoothly to a 0.5x floor by 200ms off
+  (`DUET_MULT_FALLOFF_SEC`), so a 20ms-off hit clearly outscores a 140ms-off one instead of both
+  landing in the same bucket. Every correct press also pops a judgment word
+  (`_duet_timing_judgment`: "Perfect!" within 60ms, "Good!" within 130ms, else "Early!"/"Late!"
+  depending on which side of the beat it landed) - cosmetic labeling layered on the continuous
+  score, not a second scoring system of its own. Deliberately never a
+  fail condition of its own - sloppy timing costs points, not the run. A growing-circle gauge over
+  the Resonator (`_on_duet_ring_draw`) shows the beat coming due before you press, and the ring
+  flash afterward is colored along the same red -> yellow -> green gradient as the score falloff
+  (`_duet_timing_color`), so the feedback reads as one continuous scale end to end.
 
 Both difficulty knobs (notes per phrase, tempo) ramp with round count on a Chaos-style capped
 curve rather than jumping straight to full density/speed - round 1 starts at 2-3 notes around

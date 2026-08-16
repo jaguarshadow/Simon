@@ -20,6 +20,20 @@ Chamber) specified against mechanics that no longer exist or are now redundant w
 behavior. **This pass resolves all four** with real redesigns (below) rather than leaving them
 flagged — see each entry's own note on what changed and why.
 
+**Superseded by [modifier-audit.md](modifier-audit.md):** the charge/"uses" pools and the Peek/
+Rewind manual-activation buttons described below for Safety Net, Echo Chamber, Second Wind,
+Unbreakable, Quick Rewind, and Grand Finale no longer exist. A later audit concluded no modifier
+should track a countable resource or require a mid-flow click (rule 6) — all six are now either
+Passive or an automatic Roll/state check; Grand Finale is the one documented exception, keeping its
+Gamble button since it's a pause-point choice, not a mid-sequence one. Left as-is below as the
+design record for *why* the charge system existed in the first place; `modifier-audit.md` is
+authoritative for current mechanics.
+
+**Also superseded:** Metronome and Slow Fade (Tempo, described below) have been retired and
+replaced by Constellation and Resonant Tones respectively, and the Tempo category is now labeled
+**Phrasing** — see `modifier-audit.md`'s Pass 4 for why and what shipped instead. Left as-is below
+for the same reason as above.
+
 ## Should cash-out itself pay out more? (No — Crescendo is the answer, not the base formula)
 
 Raised directly: should cashing out preserve some percentage of your combo, as a way to make it
