@@ -25,20 +25,31 @@ const STRIKE_NOISE_DURATION := 0.015
 const STRIKE_NOISE_VOLUME := 0.16
 const STRIKE_NOISE_SMOOTHING := 0.12
 
-var _player: AudioStreamPlayer
-var _generator: AudioStreamGenerator
+# A single shared AudioStreamPlayer meant every new tone hard-cut the
+# previous one mid-decay (_start_playback() stops it before playing again) -
+# no note ever got to ring out, which read as unnaturally clipped/dry for
+# anything meant to overlap, like the glissando sweep. A small round-robin
+# voice pool lets up to VOICE_POOL_SIZE notes ring concurrently while still
+# bounding total voices (the oldest slot gets stolen on the Nth+1 note).
+const VOICE_POOL_SIZE := 4
+var _voice_players: Array[AudioStreamPlayer] = []
+var _voice_generators: Array[AudioStreamGenerator] = []
+var _next_voice := 0
 var _ui_player: AudioStreamPlayer
 var _ui_generator: AudioStreamGenerator
 
 func _ready() -> void:
 	_setup_buses()
-	_generator = AudioStreamGenerator.new()
-	_generator.mix_rate = 44100.0
-	_generator.buffer_length = 2.0
-	_player = AudioStreamPlayer.new()
-	_player.stream = _generator
-	_player.bus = "Tones"
-	add_child(_player)
+	for i in VOICE_POOL_SIZE:
+		var gen := AudioStreamGenerator.new()
+		gen.mix_rate = 44100.0
+		gen.buffer_length = 2.0
+		var player := AudioStreamPlayer.new()
+		player.stream = gen
+		player.bus = "Tones"
+		add_child(player)
+		_voice_players.append(player)
+		_voice_generators.append(gen)
 	_ui_generator = AudioStreamGenerator.new()
 	_ui_generator.mix_rate = 44100.0
 	_ui_generator.buffer_length = 1.0
@@ -96,7 +107,7 @@ func _generate_harmonic(freq: float, duration: float, volume: float, decay_rate:
 	var playback := _start_playback()
 	if playback == null:
 		return
-	var mix_rate := _generator.mix_rate
+	var mix_rate := 44100.0
 	var sample_count := int(mix_rate * duration)
 	var noise_samples := int(mix_rate * STRIKE_NOISE_DURATION)
 	var filtered_noise := 0.0
@@ -117,6 +128,8 @@ func _generate_harmonic(freq: float, duration: float, volume: float, decay_rate:
 		playback.push_frame(Vector2(sample, sample))
 
 func _start_playback() -> AudioStreamGeneratorPlayback:
-	_player.stop()
-	_player.play()
-	return _player.get_stream_playback() as AudioStreamGeneratorPlayback
+	var player := _voice_players[_next_voice]
+	_next_voice = (_next_voice + 1) % VOICE_POOL_SIZE
+	player.stop()
+	player.play()
+	return player.get_stream_playback() as AudioStreamGeneratorPlayback

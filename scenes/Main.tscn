@@ -11,6 +11,20 @@ corner_radius_bottom_left = 80
 shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 10
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_track"]
+bg_color = Color(1, 1, 1, 0.14)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_fill"]
+bg_color = Color(0.55, 0.78, 1.0, 0.95)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_settingsbg"]
 bg_color = Color(0.07, 0.07, 0.09, 0.98)
 corner_radius_top_left = 14
@@ -50,6 +64,15 @@ offset_top = 320.0
 offset_right = 480.0
 offset_bottom = 480.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_resonator")
+
+[node name="DuetRing" type="Control" parent="." unique_id=3517182609]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="PadRing" type="Control" parent="." unique_id=1090960670]
 layout_mode = 1
@@ -205,6 +228,14 @@ offset_top = 40.0
 offset_right = 220.0
 offset_bottom = 76.0
 text = "Exit Music"
+
+[node name="TuneButton" type="Button" parent="MusicBar"]
+layout_mode = 0
+offset_left = 230.0
+offset_top = 40.0
+offset_right = 310.0
+offset_bottom = 76.0
+text = "Tune"
 
 [node name="SettingsButton" type="Button" parent="." unique_id=2112373000]
 layout_mode = 1
@@ -536,9 +567,12 @@ layout_mode = 2
 text = "Master"
 
 [node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
 max_value = 1.0
 step = 0.01
 value = 1.0
@@ -559,9 +593,12 @@ layout_mode = 2
 text = "Tones"
 
 [node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
 max_value = 1.0
 step = 0.01
 value = 0.9
@@ -582,9 +619,12 @@ layout_mode = 2
 text = "UI"
 
 [node name="Slider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
-custom_minimum_size = Vector2(220, 0)
+custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
 max_value = 1.0
 step = 0.01
 value = 0.5
@@ -801,6 +841,220 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 18
 
 [node name="CloseButton" type="Button" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Close"
+
+[node name="MusicTunePanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="MusicTunePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.72)
+
+[node name="CenterContainer" type="CenterContainer" parent="MusicTunePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ContentBox" type="VBoxContainer" parent="MusicTunePanel/CenterContainer"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PanelBG" type="PanelContainer" parent="MusicTunePanel/CenterContainer/ContentBox"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_settingsbg")
+
+[node name="Margin" type="MarginContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 20
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Music Tuning"
+horizontal_alignment = 1
+
+[node name="AnchorRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Anchor Return"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="ZigzagRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Zigzag Bias"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="GrooveRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Groove Repeats"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="GhostRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Ghost Notes"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="GlissandoRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Glissando"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="RiffRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+text = "Riff Shapes"
+
+[node name="Slider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+custom_minimum_size = Vector2(180, 18)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/slider = SubResource("StyleBoxFlat_slider_track")
+theme_override_styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+theme_override_styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+max_value = 1.0
+step = 0.01
+value = 0.5
+
+[node name="PctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "50%"
+horizontal_alignment = 2
+
+[node name="CloseButton" type="Button" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Close"

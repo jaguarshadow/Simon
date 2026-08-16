@@ -99,15 +99,61 @@ Phases 1–3 (UX/flow, Visual, Audio) and cross-cutting Accessibility are comple
       Applies to Normal/Chaos (cumulative sequence) and Duet Mode (per-round phrase) alike. Also
       worth coordinating with the musical-chunking TODO below — if that ships, repeated-motif
       highlighting could reuse the same visual real estate instead of adding a second indicator.
-- [ ] Future: bring real steel-tongue-drum/handpan playing idioms into the Music Mode generators —
-      current rhythm/melody generators (Euclidean rhythm + biased random walk) are general-purpose
-      generative-music techniques, not specific to this instrument. Researched idioms from actual
-      playing technique (anchor-note/drone return between melodic notes, zigzag alternating-side
-      contour across the ring, glissando sweeps, ghost notes, groove repetition instead of
-      re-rolling every bar, canonical riff shapes) — full writeup with sources in
-      `docs/music-mode.md#future-idioms-borrowed-from-how-the-real-instrument-is-played`. Anchor-
-      note return and zigzag contour flagged there as the most idiomatic-and-cheap starting point
-      given the existing `ring_order`/tonic-return machinery.
+- [x] Bring real steel-tongue-drum/handpan playing idioms into the Music Mode generators —
+      current rhythm/melody generators (Euclidean rhythm + biased random walk) were general-purpose
+      generative-music techniques, not specific to this instrument. Researched and implemented all
+      six idioms flagged from actual playing technique (anchor-note/drone return between melodic
+      notes, zigzag alternating-side contour across the ring, glissando sweeps, ghost notes, groove
+      repetition instead of re-rolling every bar, canonical riff shapes) — full writeup with
+      sources in `docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played`. Each
+      idiom got its own player-facing slider in a new Music Mode "Tune" panel (session-only,
+      defaults to 50% = the tuned amount), and three of the six (anchor return, zigzag contour,
+      riff shapes — the ones that are pure note-selection bias rather than extra notes or
+      rhythm-grid tricks) were also ported into Normal/Chaos Mode's sequence generator at fixed
+      defaults, since they don't add/remove notes from the memorized sequence.
+- [x] Fix a measured note-distribution bias in Music Mode — a player reported the generator
+      "favoriting certain notes between runs too often"; added histogram logging
+      (`_music_log_degree()`/`_print_music_degree_distribution()`) to confirm it rather than guess.
+      Went through two rounds, each checked against fresh log data rather than assumed correct.
+      **Round 1:** visitation decayed smoothly from the tonic down to its octave (24% down to 5% vs.
+      a uniform 12.5%) — root cause was phrase-end resolution and anchor-return always forcing the
+      walk back to degree 0 specifically, a boundary of the range rather than its middle (textbook
+      random-walk mean-reversion, same symptom reported against Max/MSP's `drunk` object). Fixed by
+      resolving to *either* the tonic or its in-range octave. **Round 2:** re-checked against more
+      sessions and found round 1 wasn't actually correct — the player pushed back on "why would
+      every song converge to similar-looking uniformity," which was the right question, since
+      uniform distribution across scale degrees isn't even the right target: real tonal melodies
+      favor the tonic and dominant per Krumhansl & Kessler's tonal-hierarchy research, and round 1's
+      fix was instead just favoring whichever degree sat physically adjacent to a reset point (the
+      mediant, not the musically-more-important dominant). Replaced with `_scale_degree_weight()` /
+      `_pick_resolution_degree()`, which weight resolution targets by tonal-hierarchy tier (tonic >
+      third/fifth > passing tones excluded) computed generically from each scale's tuned
+      frequencies. **Round 3:** checked again rather than declared done — round 2 got the
+      categorical shape right (chord tones 72-80% of notes played, passing tones 20-28%, matching
+      the tonal-hierarchy tiering), but the mediant (F) was consistently beating the tonic (D)
+      itself. Root cause was one level deeper than tiering: D's tonic copy at degree 0 is a hard
+      wall (`_reflect_degree()`'s boundary), so it has exactly one neighbor — every stepwise
+      departure from it lands on that one neighbor deterministically, inflating whichever degree
+      happens to sit next to a wall regardless of its own musical importance. Fixed by discounting
+      wall-degree resolution weight (`MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR`) so resolution prefers
+      an interior instance of the same pitch class when one exists — see
+      `docs/music-mode.md#note-distribution-bias-fix` for the full three-round writeup, all the
+      round-by-round data, and sources.
+- [x] Surveyed further AI/algorithmic-music-generation literature for techniques not yet in the
+      generator and implemented the two that were directly actionable (a third, corpus-trained
+      Markov transition matrices, was judged not worth the architectural weight over the
+      hand-derived rules already in place). **Melodic arch:** Huron's corpus analysis of the Essen
+      folksong database found phrase-level melodic shape is overwhelmingly arch-like (rise then
+      fall) — added `_music_arch_direction()`/`MUSIC_ARCH_BIAS` as a soft per-note nudge toward
+      that trajectory, layered on top of the existing local direction rules (step inertia/
+      post-skip-reversal/zigzag) rather than replacing them; ported to Normal/Chaos Mode too since
+      it's pure direction bias. **Chord tones on strong beats:** standard tonal/counterpoint
+      practice puts chord tones on strong metrical positions and passing tones on weak ones, which
+      the generator had no notion of — `_nearest_chord_tone_degree()` nudges the bar's downbeat
+      (always the first melody note per bar, since the Euclidean generator always places an onset
+      at step 0) onto the nearest chord tone when it isn't already one. Not ported to Normal/Chaos
+      Mode, which has no rhythm grid to define "strong beat" against — see
+      `docs/music-mode.md#melodic-arch` and `docs/music-mode.md#chord-tones-on-strong-beats`.
 
 ## Scoring escalation (Balatro-style "big numbers" within a memory game's limits)
 

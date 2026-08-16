@@ -123,6 +123,18 @@ const MODIFIERS := [
 const CASHOUT_QUADRATIC_K := 2.0
 const WAVE_RESET_LENGTH := 0
 
+# Cash-Out Floor: closes the "spam tiny risk-free cash-outs forever" loophole
+# (a patient player could otherwise trivially satisfy every milestone gate -
+# Fortissimo's 10 waves, the zero-miss-wave gate, Grand Finale's 5 cash-outs -
+# without ever taking on real memory risk). Each cash-out raises the minimum
+# `unbanked_points` required before Cash Out works again; the raise shrinks
+# each time (diminishing curve) and never exceeds the cap, so a very long run
+# doesn't eventually get locked out of ever cashing out safely again - it
+# just can't be done in tiny, risk-free increments forever.
+const CASHOUT_FLOOR_BASE := 35.0
+const CASHOUT_FLOOR_DECAY := 0.85
+const CASHOUT_FLOOR_CAP := 250
+
 # Music Mode: rhythm generated as a Euclidean pattern (Bjorklund's algorithm)
 # over a fixed 16-step bar, re-rolled each phrase for variety.
 const MUSIC_RHYTHM_STEPS := 16
@@ -134,6 +146,79 @@ const MUSIC_NARROW_LEAP_SCALES := ["d_minor", "c_major_diatonic", "chromatic_run
 const MUSIC_PENTATONIC_MAX_LEAP := 4
 const MUSIC_NARROW_MAX_LEAP := 3
 const MUSIC_PHRASE_BARS := 4
+# Melodic arch (see docs/music-mode.md#melodic-arch) - corpus studies of real
+# melodies (Huron 1996, Essen folksong database) find the single most common
+# phrase-level shape by a wide margin is an arch: rise, then fall. The
+# per-note step-inertia/post-skip-reversal rules above only shape local
+# motion, with nothing steering the phrase's overall trajectory - this is a
+# soft per-note nudge toward that trajectory, layered on top rather than
+# replacing the local rules (it's checked after they pick a direction, and
+# skipped for gap-fill reversals - see _music_next_delta()).
+const MUSIC_ARCH_BIAS := 0.3
+# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-strong-
+# beats) - see _nearest_chord_tone_degree() for the mechanism.
+const MUSIC_STRONG_BEAT_CHORD_TONE_CHANCE := 0.4
+# Anchor-note return (handpan "ding"/drone technique - see
+# docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played):
+# a small
+# per-note chance of weaving back to the tonic mid-phrase, not just at the
+# phrase-boundary resolution below. Frequency is player-tunable - see the
+# "anchor_return" idiom slider (MUSIC_IDIOM_RANGES) above.
+# Zigzag / alternating-side contour (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played -
+# handpan layouts are numbered so players alternate hands across the ring;
+# this is that physical constraint expressed as a melodic bias). Only used
+# when there's no established scale-degree direction to defer to (session
+# start, right after a phrase-end or anchor-return reset) - see
+# _music_next_delta(). Bias strength is player-tunable via the "zigzag_bias"
+# idiom slider.
+# Groove repetition (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played - tongue-drum
+# tutorials teach practicing over a repeating loop rather than constantly
+# varying): after playing a bar's rhythm, a chance to hold that same
+# Euclidean pattern for a couple more bars instead of re-rolling every bar.
+# Hold chance is player-tunable via the "groove_repeats" idiom slider; the
+# hold length itself is not.
+const MUSIC_GROOVE_HOLD_BARS := 2
+# Ghost notes (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - very light, near-
+# silent filler taps on the last-played pad, dropped into the Euclidean
+# pattern's silent steps. Purely decorative: doesn't touch the melody walk.
+# Frequency is player-tunable via the "ghost_notes" idiom slider.
+const MUSIC_GHOST_VOLUME := 0.12
+const MUSIC_GHOST_DECAY := 10.0
+const MUSIC_GHOST_FLASH_FRACTION := 0.4
+# Glissando sweep (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - a rare full-ring
+# run between phrases, single direction, quiet and quick. Frequency is
+# player-tunable via the "glissando" idiom slider. Spacing/decay are
+# clamped to a floor, not just a ceiling - the original fraction-of-
+# step_duration-only version produced ~30ms blips with a fast decay, too
+# short for the struck-tongue harmonic content to read as a pitch at all
+# (sounded like electronic beeps instead of an instrument). Longer notes
+# with a slower decay let each one ring into the next for a legato slide.
+const MUSIC_GLISSANDO_SPACING_FRACTION := 0.6
+const MUSIC_GLISSANDO_MIN_SPACING := 0.09
+const MUSIC_GLISSANDO_MAX_SPACING := 0.16
+const MUSIC_GLISSANDO_VOLUME := 0.28
+const MUSIC_GLISSANDO_DECAY := 4.5
+const MUSIC_GLISSANDO_FLASH_FRACTION := 0.75
+# Canonical riff shapes (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - small
+# numbered shapes tongue-drum beginners are taught, expressed as scale-degree
+# offsets from a phrase's opening tonic. Occasionally seeded instead of a
+# pure random walk at the start of a phrase. Frequency is player-tunable via
+# the "riff_shapes" idiom slider.
+const MUSIC_RIFF_SHAPES := [[0, 2, 4, 2], [0, 1, 2, 3, 4], [0, 2, 1, 3, 0], [0, 4, 2, 0]]
+# Normal Mode borrows three of these idioms (anchor return, zigzag contour,
+# riff shapes) since they're pure note-selection bias - they change which
+# pad the walk lands on but never add/remove a note from `sequence`, so the
+# memorized sequence and its length are untouched (see
+# docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played).
+# Fixed at their tuned defaults rather than wired to the
+# Music Mode idiom sliders - those sliders are for passive-listening
+# tuning and shouldn't silently change what a memory-game run sounds like.
+# Ghost notes/groove repeats/glissando are NOT ported: ghost notes would
+# read as an extra note to memorize, and groove/glissando have no meaning
+# without Music Mode's bar/rhythm structure.
+const NORMAL_ANCHOR_RETURN_CHANCE := 0.12
+const NORMAL_ZIGZAG_BIAS := 0.75
+const NORMAL_RIFF_CHANCE := 0.25
 # The 30% flat "repeat" chance in the walk, combined with edges clamping a
 # blocked step back onto the same degree, can otherwise chain into long
 # runs of the identical note - hard-cap it instead of leaving it to chance.
@@ -161,6 +246,12 @@ const DUET_BPM_BASE_MIN := 88.0
 const DUET_BPM_BASE_MAX := 100.0
 const DUET_BPM_RAMP_PER_ROUND := 2.5
 const DUET_BPM_CAP := 150.0
+# Duet's timing gauge: a pie-style fill over the Resonator's own disc
+# (radius DUET_RING_RADIUS) that fills from empty to full across the gap
+# between the previous pulse and the note currently due, so the beat the
+# player is echoing is visible, not just audible. Full = press now.
+const DUET_RING_RADIUS := 78.0
+const DUET_RING_FLASH_SEC := 0.28
 # Randomized once per Music Mode session (not per phrase) so tempo doesn't
 # jitter bar-to-bar.
 const MUSIC_BPM_MIN := 55.0
@@ -244,9 +335,11 @@ const ONBOARDING_STEPS := [
 # list at runtime (_build_faq_content) rather than hand-laid-out in the
 # scene, same reasoning as everything else generated from data in this file.
 const FAQ_ENTRIES := [
-	{"q": "What is this?", "a": "A memory game - you know the one - rebuilt as a steel tongue drum. Watch a sequence, tap it back, don't miss."},
+	{"q": "What is this?", "a": "A memory game, rebuilt as a steel tongue drum."},
 	{"q": "Why did you build this?", "a": "To practice with godot, other dev tools, and have fun."},
-	{"q": "How does Music Mode write its own songs?", "a": "Two generators, recomputed every bar. Rhythm comes from Bjorklund's algorithm, which spaces out N hits as evenly as possible across 16 steps - the same math behind a lot of real-world grooves. Melody is a random walk over the scale, biased so a step tends to keep going the same direction and a leap tends to reverse right after, because that's roughly how real melodies move."},
+	{"q": "How does Music Mode write its own songs?", "a": "Two generators, recomputed every bar. Rhythm comes from Bjorklund's algorithm, which spaces out N hits as evenly as possible across 16 steps - the same math behind a lot of real-world grooves. Melody is a random walk over the scale, biased so a step tends to keep going the same direction and a leap tends to reverse right after, because that's roughly how real melodies move - and each phrase quietly arcs upward then back down, the single most common shape in a 6000-song corpus study of folk melodies. On top of that walk sit six idioms borrowed from actual handpan/tongue-drum playing technique - drone returns to the tonic, a zigzag contour across the ring, glissando sweeps, ghost notes, groove repeats, and canonical riff shapes. Full writeup in docs/music-mode.md."},
+	{"q": "Why does the music favor some notes over others?", "a": "On purpose - real melodies lean on the tonic and its chord tones instead of spreading evenly across the scale (music-cognition researchers call this 'tonal hierarchy'), and the strong beat of every bar leans toward a chord tone too, the same way real melodies put stable notes on the downbeat and save the in-between tones for passing through. Getting the balance right took three rounds of tuning against real playback logs - the first two fixes looked plausible until the numbers said otherwise."},
+	{"q": "What do the sliders in Music Mode's Tune panel do?", "a": "Each of the six playing idioms above gets its own slider, defaulting to the middle (exactly the tuned amount that ships by default). Drag toward 0% to turn an idiom off, or toward 100% for a lot more of it. They're session-only - back to 50% every time you start Music Mode - and they don't touch Normal/Chaos Mode's sequence generation at all."},
 	{"q": "How does scoring work?", "a": "Points pile up in an unbanked pool while you play. Hit Cash Out whenever you want to lock them in - longer streak, bigger bonus - but a miss before you cash out forfeits whatever's still unbanked. Everything already banked is yours forever."},
 	{"q": "What are modifiers?", "a": "Every 3rd round you draft one. Four slots - Dynamics, Grace, Tempo, Ornament - one modifier equipped per slot at a time. Picking the same one again levels it up (1 to 5); picking a different one swaps it in. 24 to find."},
 	{"q": "Normal, Chaos, Duet, Zen, Music - what's the difference?", "a": "Normal is the standard climb. Chaos reshuffles the pads and speeds up. Duet has the game play a phrase for you to echo back. Zen has no sequence or fail state, just noodling. Music plays itself - hands in your lap, just listen."},
@@ -255,6 +348,7 @@ const FAQ_ENTRIES := [
 
 @onready var background_rect: ColorRect = $Background
 @onready var resonator_panel: Panel = $Resonator
+@onready var duet_ring: Control = $DuetRing
 @onready var pad_ring: Control = $PadRing
 @onready var start_button: Button = $ModeBar/StartButton
 @onready var round_label: Label = $RoundLabel
@@ -329,6 +423,40 @@ const MIX_DEFAULTS := {"Master": 1.0, "Tones": 0.9, "UI": 0.5}
 	"Tones": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow/PctLabel,
 	"UI": $SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow/PctLabel,
 }
+# Music Mode idiom sliders (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - each
+# controls how often one of the steel-tongue-drum idioms fires, as a 0..1
+# slider position mapped through MUSIC_IDIOM_RANGES (min at 0, "default" at
+# 0.5 - always the tuned constant each idiom shipped with - max at 1) via
+# _music_idiom_value()'s two-segment lerp. Split into two segments (instead
+# of one lerp(min, max, slider)) so an idiom whose tuned default is far from
+# a satisfying "extreme" - e.g. glissando's default of a rare 10% chance -
+# can still have a max worth dragging to (was capped at 20% under a
+# symmetric range, which a player at 100% would barely ever hear).
+const MUSIC_IDIOM_KEYS := ["anchor_return", "zigzag_bias", "groove_repeats", "ghost_notes", "glissando", "riff_shapes"]
+const MUSIC_IDIOM_RANGES := {
+	"anchor_return": {"min": 0.0, "default": 0.12, "max": 0.45},
+	"zigzag_bias": {"min": 0.5, "default": 0.75, "max": 1.0},
+	"groove_repeats": {"min": 0.0, "default": 0.35, "max": 0.7},
+	"ghost_notes": {"min": 0.0, "default": 0.18, "max": 0.45},
+	"glissando": {"min": 0.0, "default": 0.1, "max": 0.85},
+	"riff_shapes": {"min": 0.0, "default": 0.25, "max": 0.6},
+}
+@onready var music_idiom_sliders: Dictionary = {
+	"anchor_return": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow/Slider,
+	"zigzag_bias": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow/Slider,
+	"groove_repeats": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow/Slider,
+	"ghost_notes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow/Slider,
+	"glissando": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow/Slider,
+	"riff_shapes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow/Slider,
+}
+@onready var music_idiom_pct_labels: Dictionary = {
+	"anchor_return": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow/PctLabel,
+	"zigzag_bias": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow/PctLabel,
+	"groove_repeats": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow/PctLabel,
+	"ghost_notes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow/PctLabel,
+	"glissando": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow/PctLabel,
+	"riff_shapes": $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow/PctLabel,
+}
 @onready var zen_button: Button = $ModeBar/ZenButton
 @onready var zen_bar: Control = $ZenBar
 @onready var exit_zen_button: Button = $ZenBar/ExitZenButton
@@ -336,6 +464,9 @@ const MIX_DEFAULTS := {"Master": 1.0, "Tones": 0.9, "UI": 0.5}
 @onready var music_button: Button = $ModeBar/MusicButton
 @onready var music_bar: Control = $MusicBar
 @onready var exit_music_button: Button = $MusicBar/ExitMusicButton
+@onready var music_tune_button: Button = $MusicBar/TuneButton
+@onready var music_tune_panel: Control = $MusicTunePanel
+@onready var music_tune_close_button: Button = $MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/CloseButton
 @onready var duet_button: Button = $ModeBar/DuetButton
 
 var pads_by_name: Dictionary = {}
@@ -365,16 +496,32 @@ var _duet_last_press := ""
 var _duet_last_press_pos := Vector2.ZERO
 var _duet_response_start_ms := 0
 var _duet_note_deadline_ms := 0
+var _duet_note_wait_start_ms := 0
 var _duet_ability_pause := false
+var _duet_ring_frozen_now_t := 0.0
+var _duet_ring_flash_start_ms := -100000
+var _duet_ring_flash_color := Color.WHITE
 var _normal_current_degree := 0
 var _normal_last_direction := 0
 var _normal_last_was_leap := false
 var _normal_repeat_streak := 1
+var _normal_riff: Array = []
+var _normal_riff_index := 0
+var _normal_riff_base := 0
 var _music_repeat_streak := 1
 var _music_current_degree := 0
 var _music_last_direction := 0
 var _music_last_was_leap := false
 var _music_bar_index := 0
+var _music_groove_rhythm: Array[bool] = []
+var _music_groove_bars_left := 0
+# Debug instrumentation to check whether the walk/idiom biases skew note
+# selection more than expected - see _music_log_degree() and
+# _print_music_degree_distribution(). Session-only, matches how the idiom
+# sliders reset (see _reset_music_idiom_sliders()).
+const MUSIC_LOG_INTERVAL := 32
+var _music_degree_counts: Dictionary = {}
+var _music_notes_logged := 0
 var best_score := 0
 var best_round := 0
 var best_combo := 0
@@ -383,6 +530,7 @@ var onboarding_seen := false
 var onboarding_step := 0
 var mix_levels: Dictionary = MIX_DEFAULTS.duplicate()
 var reduce_motion := false
+var music_idiom_levels: Dictionary = {"anchor_return": 0.5, "zigzag_bias": 0.5, "groove_repeats": 0.5, "ghost_notes": 0.5, "glissando": 0.5, "riff_shapes": 0.5}
 var run_start_best_score := 0
 var run_start_best_round := 0
 var run_start_best_combo := 0
@@ -421,6 +569,7 @@ var rubato_two_directional := false
 var best_streak_this_run := 0
 var current_streak_had_miss := false
 var run_cashout_count := 0
+var cash_out_floor := 0
 var unbreakable_forgiven_this_streak := 0
 var double_down_index := -1
 var double_down_chain_pending := false
@@ -494,6 +643,8 @@ func _ready() -> void:
 	exit_zen_button.pressed.connect(_on_exit_zen_pressed)
 	music_button.pressed.connect(_on_music_button_pressed)
 	exit_music_button.pressed.connect(_on_exit_music_pressed)
+	music_tune_button.pressed.connect(_on_music_tune_button_pressed)
+	music_tune_close_button.pressed.connect(_on_music_tune_close_pressed)
 	duet_button.pressed.connect(_on_start_pressed.bind("duet"))
 	cash_out_button.pressed.connect(_on_cash_out_button_pressed)
 	for i in modifier_buttons.size():
@@ -511,9 +662,11 @@ func _ready() -> void:
 	game_over_close_button.pressed.connect(_on_game_over_close_pressed)
 	faq_button.pressed.connect(_on_faq_button_pressed)
 	faq_close_button.pressed.connect(_on_faq_close_pressed)
+	duet_ring.draw.connect(_on_duet_ring_draw)
 	_build_faq_content()
 	_connect_ui_clicks()
 	_setup_mix_sliders()
+	_setup_music_idiom_sliders()
 	reduce_motion_check.button_pressed = reduce_motion
 	reduce_motion_check.toggled.connect(_on_reduce_motion_toggled)
 	_apply_theme()
@@ -799,6 +952,7 @@ func _connect_ui_clicks() -> void:
 		settings_confirm_yes_button, settings_confirm_no_button,
 		help_button, onboarding_skip_button, onboarding_next_button,
 		game_over_close_button, cash_out_button, faq_button, faq_close_button,
+		music_tune_button, music_tune_close_button,
 	]
 	ui_click_buttons.append_array(scale_buttons)
 	ui_click_buttons.append_array(palette_buttons)
@@ -824,6 +978,43 @@ func _on_mix_slider_changed(value: float, bus_name: String) -> void:
 func _update_mix_pct_label(bus_name: String) -> void:
 	var label: Label = mix_pct_labels[bus_name]
 	label.text = "%d%%" % round(mix_levels[bus_name] * 100.0)
+
+func _setup_music_idiom_sliders() -> void:
+	for key in MUSIC_IDIOM_KEYS:
+		var slider: HSlider = music_idiom_sliders[key]
+		slider.value = music_idiom_levels[key]
+		_update_music_idiom_pct_label(key)
+		slider.value_changed.connect(_on_music_idiom_slider_changed.bind(key))
+
+func _on_music_idiom_slider_changed(value: float, key: String) -> void:
+	music_idiom_levels[key] = value
+	_update_music_idiom_pct_label(key)
+
+func _update_music_idiom_pct_label(key: String) -> void:
+	var label: Label = music_idiom_pct_labels[key]
+	label.text = "%d%%" % round(music_idiom_levels[key] * 100.0)
+
+# Music idiom sliders are session-only tuning, not a saved preference (see
+# _on_music_button_pressed()) - every fresh Music Mode session starts back
+# at 50% (the tuned default) for all six, regardless of where they were
+# left last time.
+func _reset_music_idiom_sliders() -> void:
+	for key in MUSIC_IDIOM_KEYS:
+		music_idiom_levels[key] = 0.5
+		var slider: HSlider = music_idiom_sliders[key]
+		slider.value = 0.5
+		_update_music_idiom_pct_label(key)
+
+# Maps a slider's 0..1 position through MUSIC_IDIOM_RANGES to the actual
+# probability/bias value the Music Mode generators use - see the
+# MUSIC_IDIOM_KEYS declaration for why 0.5 always reproduces the tuned
+# default, and why this is two lerps (0..0.5 and 0.5..1) instead of one.
+func _music_idiom_value(key: String) -> float:
+	var idiom_range: Dictionary = MUSIC_IDIOM_RANGES[key]
+	var slider: float = music_idiom_levels[key]
+	if slider <= 0.5:
+		return lerpf(idiom_range["min"], idiom_range["default"], slider / 0.5)
+	return lerpf(idiom_range["default"], idiom_range["max"], (slider - 0.5) / 0.5)
 
 func _on_reduce_motion_toggled(is_on: bool) -> void:
 	reduce_motion = is_on
@@ -859,6 +1050,12 @@ func _on_faq_button_pressed() -> void:
 
 func _on_faq_close_pressed() -> void:
 	faq_panel.visible = false
+
+func _on_music_tune_button_pressed() -> void:
+	music_tune_panel.visible = true
+
+func _on_music_tune_close_pressed() -> void:
+	music_tune_panel.visible = false
 	_refresh_loadout_hud()
 
 func _show_onboarding() -> void:
@@ -1064,7 +1261,7 @@ func _refresh_loadout_hud() -> void:
 	if equipped_modifiers["bonus_event"] == "grand_finale":
 		var gf_charges := int(modifier_resource.get("grand_finale", 0))
 		gamble_button.visible = true
-		gamble_button.disabled = gf_charges <= 0 or unbanked_points <= 0 or grand_finale_pending or not accepting_input
+		gamble_button.disabled = gf_charges <= 0 or unbanked_points < cash_out_floor or grand_finale_pending or not accepting_input
 		gamble_button.text = "Gambling..." if grand_finale_pending else "Gamble (%d, x%.1f)" % [gf_charges, float(_mod_val("grand_finale", "mult"))]
 	else:
 		gamble_button.visible = false
@@ -1651,10 +1848,12 @@ func _on_music_button_pressed() -> void:
 		music_bar.visible = true
 		settings_button.disabled = false
 		_set_pads_disabled(true)
+		_reset_music_idiom_sliders()
 	)
 	_music_loop()
 
 func _on_exit_music_pressed() -> void:
+	_print_music_degree_distribution()
 	await _cross_fade_mode_switch(func():
 		music_mode = false
 		start_button.visible = true
@@ -1666,6 +1865,7 @@ func _on_exit_music_pressed() -> void:
 		combo_label.visible = true
 		score_label.visible = true
 		music_bar.visible = false
+		music_tune_panel.visible = false
 		round_label.text = "Round: 0"
 		score_label.text = "Score: 0"
 		start_button.disabled = false
@@ -1738,6 +1938,119 @@ func _reflect_degree(raw_target: int) -> int:
 		reflected = (PAD_COUNT - 1) * 2 - reflected
 	return clampi(reflected, 0, PAD_COUNT - 1)
 
+# Fix for a measured note-frequency bias (see docs/music-mode.md#note-
+# distribution-bias-fix). Round 1 (superseded) always resolved anchor-
+# return/phrase-end to degree 0 specifically - one edge of the walk's range,
+# not the middle - which is textbook random-walk "mean reversion": an
+# excursion away from a reset point gets cut short before it can reach the
+# far edge, so degree 0's *neighborhood* got over-visited. Splitting the
+# reset target across the tonic's every in-range octave fixed that lopsided
+# decay, but logged histograms of the "fixed" version were still uneven in a
+# musically wrong way: the b3 degree (F, adjacent to the tonic's two
+# reset points) consistently out-visited the 5th/dominant degree (A) 2-4x
+# over, even though real tonal melodies favor the dominant on par with the
+# tonic - see Krumhansl & Kessler's tonal-hierarchy probe-tone studies
+# (docs/music-mode.md#note-distribution-bias-fix has the full writeup and
+# sources). The walk had no concept of *which* degrees are musically
+# important - "close to a reset point" isn't the same thing as "structurally
+# stable" - so proximity to the tonic's magnets, not real tonal function,
+# was deciding what got favored.
+#
+# Round 2: resolution now targets any scale degree in the tonic triad
+# (tonic, third, fifth - identified generically via semitone distance from
+# the tonic, not hardcoded per scale), weighted by tonal-hierarchy tier
+# (tonic weighted highest, third/fifth next, passing tones excluded
+# entirely - resolving to an unstable degree would defeat the point of
+# "resolution"). This generalizes round 1: the tonic's octave is still in
+# the stable set (0 semitones from the tonic, same as the tonic itself) and
+# still gets the highest weight, but the dominant and mediant now get a
+# real, weighted share of resolution traffic instead of none.
+const MUSIC_DEGREE_WEIGHT_TONIC := 2.4
+const MUSIC_DEGREE_WEIGHT_TRIAD := 1.5
+# Round 3 (see docs/music-mode.md#note-distribution-bias-fix): round 2's
+# weighting was fair among stable degrees, but the *overall* histogram still
+# showed the mediant (F) beating the tonic (D) - traced to degree 0 being a
+# hard wall. `_reflect_degree()` means a boundary degree has exactly one
+# neighbor, so any stepwise departure from it is forced onto that single
+# neighbor 100% of the time (no coin flip), inflating whichever degree
+# happens to sit next to a wall regardless of its own tonal importance. An
+# interior instance of the same pitch class (e.g. degree 5, this scale's
+# other D) doesn't have that problem - stepwise departures from it split
+# across two neighbors like everywhere else. Discounting boundary degrees
+# relative to interior ones so resolution prefers the interior instance when
+# one exists (falling back to the boundary degree when it's the only option,
+# e.g. `chromatic_run`'s single, non-repeating tonic) removes the forced-
+# neighbor effect without touching the tonal-hierarchy tiering itself.
+const MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR := 0.4
+
+# Semitone distance from the tonic (degree 0), via the scale's actual tuned
+# frequencies rather than hardcoded per-scale music theory - works for any
+# scale definition in SCALES, including ones with unusual/non-diatonic
+# interval structure.
+func _semitones_from_tonic(degree: int, scale: Dictionary) -> int:
+	var tones: Array = scale.get("tones", [])
+	if tones.is_empty() or degree >= tones.size() or float(tones[0]) <= 0.0:
+		return 0
+	var ratio: float = float(tones[degree]) / float(tones[0])
+	var semitones := int(round(12.0 * log(ratio) / log(2.0))) % 12
+	return semitones + 12 if semitones < 0 else semitones
+
+# Tonal-hierarchy weight for a degree: tonic (0 or 12 semitones - i.e. any
+# octave) highest, minor/major third (3-4 semitones) or perfect fifth
+# (7 semitones) next, everything else (passing tones - 2nds, 4ths, 6ths,
+# 7ths) excluded from resolution entirely (weight 0). Degrees at either edge
+# of the pad range (0 or PAD_COUNT-1) get discounted - see
+# MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR above.
+func _scale_degree_weight(degree: int, scale: Dictionary) -> float:
+	var semitones := _semitones_from_tonic(degree, scale)
+	var weight := 0.0
+	if semitones == 0:
+		weight = MUSIC_DEGREE_WEIGHT_TONIC
+	elif semitones == 3 or semitones == 4 or semitones == 7:
+		weight = MUSIC_DEGREE_WEIGHT_TRIAD
+	else:
+		return 0.0
+	if degree == 0 or degree == PAD_COUNT - 1:
+		weight *= MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR
+	return weight
+
+func _pick_resolution_degree(scale: Dictionary) -> int:
+	var weights: Array[float] = []
+	var total := 0.0
+	for d in PAD_COUNT:
+		var w := _scale_degree_weight(d, scale)
+		weights.append(w)
+		total += w
+	if total <= 0.0:
+		return 0
+	var r := randf() * total
+	for d in PAD_COUNT:
+		r -= weights[d]
+		if r <= 0.0:
+			return d
+	return PAD_COUNT - 1
+
+func _is_resolution_degree(degree: int, scale: Dictionary) -> bool:
+	return _scale_degree_weight(degree, scale) > 0.0
+
+# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-strong-
+# beats): standard tonal/counterpoint practice puts chord tones on strong
+# metrical positions and reserves passing tones for weak ones. Finds the
+# closest degree with a nonzero _scale_degree_weight() (a local nudge, not a
+# jump to a weighted-random one - see the call site in
+# _generate_music_bar_melody() for why).
+func _nearest_chord_tone_degree(degree: int, scale: Dictionary) -> int:
+	var best := degree
+	var best_dist := PAD_COUNT
+	for d in PAD_COUNT:
+		if _scale_degree_weight(d, scale) <= 0.0:
+			continue
+		var dist := absi(d - degree)
+		if dist < best_dist:
+			best_dist = dist
+			best = d
+	return best
+
 func _music_reset_walk() -> void:
 	# Random starting degree, not always the tonic - so each Music/Duet
 	# session opens differently rather than sounding like the same song
@@ -1748,6 +2061,9 @@ func _music_reset_walk() -> void:
 	_music_last_was_leap = false
 	_music_bar_index = 0
 	_music_repeat_streak = 1
+	_music_groove_bars_left = 0
+	_music_degree_counts = {}
+	_music_notes_logged = 0
 
 # Biased random walk step: mostly stepwise motion, some repeats, occasional
 # leaps. Direction follows two documented melodic tendencies (Huron, "Sweet
@@ -1772,19 +2088,46 @@ func _music_next_delta(max_leap: int) -> int:
 		_music_last_was_leap = false
 		return 0
 	var direction: int
+	var is_gap_fill := false
 	if _music_last_was_leap and _music_last_direction != 0:
 		direction = -_music_last_direction
 		magnitude = 1
+		is_gap_fill = true
 	elif _music_last_direction != 0 and magnitude == 1:
 		direction = _music_last_direction if randf() < 0.70 else -_music_last_direction
 	else:
-		direction = 1 if randf() < 0.5 else -1
+		# No established scale-degree direction to defer to (session start,
+		# or right after a phrase-end/anchor-return reset) - bias toward
+		# whichever direction lands on the opposite side of the physical
+		# ring, rather than a flat coin flip, per the zigzag idiom.
+		var zigzag_bias := _music_idiom_value("zigzag_bias")
+		var current_side := _music_ring_side(_music_current_degree)
+		var plus_side := _music_ring_side(_reflect_degree(_music_current_degree + magnitude))
+		var minus_side := _music_ring_side(_reflect_degree(_music_current_degree - magnitude))
+		if plus_side != current_side and minus_side == current_side:
+			direction = 1 if randf() < zigzag_bias else -1
+		elif minus_side != current_side and plus_side == current_side:
+			direction = -1 if randf() < zigzag_bias else 1
+		else:
+			direction = 1 if randf() < 0.5 else -1
+	# Melodic arch (see docs/music-mode.md#melodic-arch) - not applied to a
+	# gap-fill reversal, since that's a hard contour rule (Narmour) the arch
+	# shouldn't second-guess.
+	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
+		direction = _music_arch_direction()
 	_music_last_direction = direction
 	_music_last_was_leap = magnitude >= 2
 	return direction * magnitude
 
-# One bar's worth of scale degrees (0-7), one per rhythm pulse. Walk starts
-# at the tonic and is forced back to it on the last note of every
+# Which way the phrase-level melodic arch wants the walk to move right now -
+# up through the first half of a phrase, down through the second half. See
+# docs/music-mode.md#melodic-arch.
+func _music_arch_direction() -> int:
+	return 1 if (_music_bar_index % MUSIC_PHRASE_BARS) * 2 < MUSIC_PHRASE_BARS else -1
+
+# One bar's worth of scale degrees (0-7), one per rhythm pulse. Forced back
+# to a resolution degree (tonic/third/fifth, weighted by tonal-hierarchy
+# tier - see _pick_resolution_degree()) on the last note of every
 # MUSIC_PHRASE_BARS-th bar, so phrases have a clear landing point.
 func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	if pulse_count <= 0:
@@ -1793,8 +2136,46 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
 	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
 	var degrees: Array[int] = []
+	# Canonical riff shape: only offered at the start of a phrase (mirrors
+	# how these are taught - fixed little patterns, not spliced into the
+	# middle of an improvised line). Expressed as offsets from wherever the
+	# walk currently sits, not hardcoded to degree 0, so it still works when
+	# a session opens on a non-tonic degree (see _music_reset_walk()).
+	var riff: Array = []
+	if _music_bar_index % MUSIC_PHRASE_BARS == 0 and randf() < _music_idiom_value("riff_shapes"):
+		riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
+	var riff_base := _music_current_degree
 	for i in pulse_count:
+		if i < riff.size():
+			var riff_degree := _reflect_degree(riff_base + int(riff[i]))
+			degrees.append(riff_degree)
+			_music_current_degree = riff_degree
+			_music_last_direction = 0
+			_music_repeat_streak = 1
+			continue
 		var degree := _music_current_degree
+		# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-
+		# strong-beats): pulse 0 is always the bar's downbeat (the Euclidean
+		# generator always places an onset at step 0 - see
+		# _euclidean_rhythm()), so nudge it to the nearest chord tone when the
+		# walk happens to be sitting on a passing tone there, rather than
+		# leaving harmonic placement to chance. A nudge to the *nearest*
+		# chord tone, not a jump to a weighted-random one like anchor-return -
+		# this is meant to read as "the walk's current position resolved
+		# slightly," not a deliberate drone return.
+		if i == 0 and not _is_resolution_degree(degree, scale) and randf() < MUSIC_STRONG_BEAT_CHORD_TONE_CHANCE:
+			degree = _nearest_chord_tone_degree(degree, scale)
+			_music_current_degree = degree
+		if not _is_resolution_degree(degree, scale) and randf() < _music_idiom_value("anchor_return"):
+			# Ghost return to a tonal-hierarchy-weighted tonic/third/fifth,
+			# same reset the phrase-end resolution below does - so the walk
+			# resumes cleanly from the anchor rather than carrying momentum
+			# from before the jump. See _pick_resolution_degree() for why
+			# this isn't just degree 0.
+			degree = _pick_resolution_degree(scale)
+			_music_current_degree = degree
+			_music_last_direction = 0
+			_music_repeat_streak = 1
 		degrees.append(degree)
 		var delta := _music_next_delta(max_leap)
 		var raw_target := degree + delta
@@ -1811,8 +2192,9 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 		_music_current_degree = new_degree
 	_music_bar_index += 1
 	if _music_bar_index % MUSIC_PHRASE_BARS == 0:
-		degrees[degrees.size() - 1] = 0
-		_music_current_degree = 0
+		var resolution_degree := _pick_resolution_degree(scale)
+		degrees[degrees.size() - 1] = resolution_degree
+		_music_current_degree = resolution_degree
 		_music_last_direction = 0
 	return degrees
 
@@ -1827,6 +2209,69 @@ func _music_pad_for_degree(degree: int) -> SimonButton:
 		return null
 	return pads_by_name[pad_names[ring_pos]]
 
+# Which physical half of the ring a scale degree sits on, per the current
+# scale's ring_order - used for the zigzag contour bias, not for lookup.
+func _music_ring_side(degree: int) -> int:
+	var scale: Dictionary = SCALES[current_scale_index]
+	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
+	var ring_pos: int = ring_order.find(degree)
+	if ring_pos == -1:
+		return 0
+	return 0 if ring_pos < PAD_COUNT / 2 else 1
+
+# Glissando sweep (see docs/music-mode.md#idioms-borrowed-from-how-the-real-instrument-is-played) - a quick single-
+# direction run across every pad, played as a rare special event between
+# phrases rather than folded into the normal rhythm/melody roll. Swept by
+# scale degree (pitch order), not by ring_pos (physical ring layout) - the
+# ring is deliberately zigzagged for playability, so a ring-order sweep
+# jumps around in pitch rather than sliding, which read as random blips
+# instead of a glissando. Degree order is pitch-ascending (see the `tones`
+# arrays in SCALES), so this always slides smoothly up or down even though
+# it lights pads in their zigzagged physical positions on screen.
+func _music_glissando_sweep(step_duration: float) -> void:
+	var spacing: float = clampf(step_duration * MUSIC_GLISSANDO_SPACING_FRACTION, MUSIC_GLISSANDO_MIN_SPACING, MUSIC_GLISSANDO_MAX_SPACING)
+	var flash_dur := spacing * MUSIC_GLISSANDO_FLASH_FRACTION
+	var degrees := range(PAD_COUNT)
+	if randf() < 0.5:
+		degrees.reverse()
+	for degree in degrees:
+		if not music_mode:
+			return
+		var pad := _music_pad_for_degree(degree)
+		if pad:
+			await pad.flash(flash_dur, MUSIC_GLISSANDO_DECAY, MUSIC_GLISSANDO_VOLUME)
+		var remaining := spacing - flash_dur
+		if remaining > 0.0:
+			await get_tree().create_timer(remaining).timeout
+
+# Debug instrumentation - tallies how often each scale degree gets played
+# and prints a running histogram every MUSIC_LOG_INTERVAL notes, so a
+# suspected "the walk favors certain notes" bias can be checked against
+# actual numbers rather than ear/memory. Remove once the walk's balance is
+# confirmed one way or the other.
+func _music_log_degree(degree: int) -> void:
+	_music_degree_counts[degree] = _music_degree_counts.get(degree, 0) + 1
+	_music_notes_logged += 1
+	if _music_notes_logged % MUSIC_LOG_INTERVAL == 0:
+		_print_music_degree_distribution()
+
+func _print_music_degree_distribution() -> void:
+	var total := 0
+	for count in _music_degree_counts.values():
+		total += count
+	if total == 0:
+		return
+	var scale: Dictionary = SCALES[current_scale_index]
+	var notes: Array = scale.get("notes", [])
+	var expected_pct := 100.0 / PAD_COUNT
+	var parts: Array[String] = []
+	for degree in range(PAD_COUNT):
+		var count: int = _music_degree_counts.get(degree, 0)
+		var pct := 100.0 * count / total
+		var note_name: String = notes[degree] if degree < notes.size() else str(degree)
+		parts.append("%s=%d(%.0f%%)" % [note_name, count, pct])
+	print("[MusicMode] n=%d, uniform=%.0f%%: %s" % [total, expected_pct, ", ".join(parts)])
+
 # Drives Music Mode: generates one Euclidean-rhythm bar + melody phrase at a
 # time and plays it, looping until the player exits. Tempo is fixed for the
 # whole session; scale/theme changes take effect on the next note lookup
@@ -1836,8 +2281,21 @@ func _music_loop() -> void:
 	var bpm := randf_range(MUSIC_BPM_MIN, MUSIC_BPM_MAX)
 	var step_duration := 60.0 / bpm / 4.0
 	var flash_duration: float = min(step_duration * MUSIC_FLASH_FRACTION, MUSIC_FLASH_MAX)
+	var last_played_pad: SimonButton = null
 	while music_mode:
-		var rhythm := _generate_music_rhythm()
+		if _music_bar_index > 0 and _music_bar_index % MUSIC_PHRASE_BARS == 0 and randf() < _music_idiom_value("glissando"):
+			await _music_glissando_sweep(step_duration)
+			if not music_mode:
+				return
+		var rhythm: Array[bool]
+		if _music_groove_bars_left > 0:
+			rhythm = _music_groove_rhythm
+			_music_groove_bars_left -= 1
+		else:
+			rhythm = _generate_music_rhythm()
+			if randf() < _music_idiom_value("groove_repeats"):
+				_music_groove_rhythm = rhythm
+				_music_groove_bars_left = MUSIC_GROOVE_HOLD_BARS
 		var pulse_count := 0
 		for on in rhythm:
 			if on:
@@ -1848,14 +2306,25 @@ func _music_loop() -> void:
 			if not music_mode:
 				return
 			if rhythm[step_index]:
-				var pad := _music_pad_for_degree(melody[note_i])
+				var degree := melody[note_i]
+				var pad := _music_pad_for_degree(degree)
 				note_i += 1
+				_music_log_degree(degree)
 				var is_downbeat := step_index == 0
 				var decay := MUSIC_ACCENT_DECAY if is_downbeat else MUSIC_DECAY_RATE
 				var volume := MUSIC_ACCENT_VOLUME if is_downbeat else MUSIC_VOLUME
 				if pad:
 					await pad.flash(flash_duration, decay, volume)
+					last_played_pad = pad
 				var remaining := step_duration - flash_duration
+				if remaining > 0.0:
+					await get_tree().create_timer(remaining).timeout
+			elif last_played_pad and randf() < _music_idiom_value("ghost_notes"):
+				# Ghost note: quiet filler tap on the last real note's pad,
+				# doesn't touch the melody walk at all.
+				var ghost_flash: float = min(step_duration * MUSIC_GHOST_FLASH_FRACTION, flash_duration)
+				await last_played_pad.flash(ghost_flash, MUSIC_GHOST_DECAY, MUSIC_GHOST_VOLUME)
+				var remaining := step_duration - ghost_flash
 				if remaining > 0.0:
 					await get_tree().create_timer(remaining).timeout
 			else:
@@ -1896,6 +2365,7 @@ func _on_start_pressed(mode: String) -> void:
 	total_round = 0
 	unbanked_points = 0
 	run_cashout_count = 0
+	cash_out_floor = 0
 	best_streak_this_run = 0
 	equipped_modifiers = {"multiplier": "", "defense": "", "tempo": "", "bonus_event": ""}
 	modifier_levels.clear()
@@ -1996,6 +2466,8 @@ func _harmonic_chain_bonus_points(base_points: int) -> int:
 	return int(round(float(base_points) * harmonic_chain_stack))
 
 func _register_wave_completed() -> void:
+	var floor_increment := CASHOUT_FLOOR_BASE * pow(CASHOUT_FLOOR_DECAY, float(run_cashout_count))
+	cash_out_floor = min(CASHOUT_FLOOR_CAP, cash_out_floor + int(round(floor_increment)))
 	run_cashout_count += 1
 	if waves_completed > best_waves:
 		var was_unlocked := best_waves >= 10
@@ -2032,6 +2504,8 @@ func _on_cash_out_button_pressed() -> void:
 	if zen_mode or music_mode or not accepting_input:
 		return
 	if grand_finale_pending:
+		return
+	if unbanked_points < cash_out_floor:
 		return
 	var total := _cash_out_total()
 	if total <= 0:
@@ -2093,6 +2567,8 @@ func _start_grand_finale_gamble() -> void:
 	if equipped_modifiers["bonus_event"] != "grand_finale" or not accepting_input:
 		return
 	if grand_finale_pending or unbanked_points <= 0:
+		return
+	if unbanked_points < cash_out_floor:
 		return
 	var charges := int(modifier_resource.get("grand_finale", 0))
 	if charges <= 0:
@@ -2221,6 +2697,8 @@ func _normal_reset_walk() -> void:
 	_normal_last_direction = 0
 	_normal_last_was_leap = false
 	_normal_repeat_streak = 1
+	_normal_riff = []
+	_normal_riff_index = 0
 
 # Normal Mode's per-round note pick. Independent state from Music/Duet's
 # walk (`_music_*` vars) since Normal's sequence is one continuously
@@ -2243,22 +2721,72 @@ func _normal_next_delta(max_leap: int) -> int:
 		_normal_last_was_leap = false
 		return 0
 	var direction: int
+	var is_gap_fill := false
 	if _normal_last_was_leap and _normal_last_direction != 0:
 		direction = -_normal_last_direction
 		magnitude = 1
+		is_gap_fill = true
 	elif _normal_last_direction != 0 and magnitude == 1:
 		direction = _normal_last_direction if randf() < 0.70 else -_normal_last_direction
 	else:
-		direction = 1 if randf() < 0.5 else -1
+		# Zigzag/alternating-side contour bias, same technique as
+		# _music_next_delta() but at the fixed NORMAL_ZIGZAG_BIAS default
+		# rather than the player-tunable Music Mode slider - see the
+		# NORMAL_ANCHOR_RETURN_CHANCE comment above.
+		var current_side := _music_ring_side(_normal_current_degree)
+		var plus_side := _music_ring_side(_reflect_degree(_normal_current_degree + magnitude))
+		var minus_side := _music_ring_side(_reflect_degree(_normal_current_degree - magnitude))
+		if plus_side != current_side and minus_side == current_side:
+			direction = 1 if randf() < NORMAL_ZIGZAG_BIAS else -1
+		elif minus_side != current_side and plus_side == current_side:
+			direction = -1 if randf() < NORMAL_ZIGZAG_BIAS else 1
+		else:
+			direction = 1 if randf() < 0.5 else -1
+	# Melodic arch, same technique as _music_next_delta() but keyed off
+	# sequence length instead of bar count, since Normal Mode has no bars -
+	# see docs/music-mode.md#melodic-arch.
+	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
+		direction = _normal_arch_direction()
 	_normal_last_direction = direction
 	_normal_last_was_leap = magnitude >= 2
 	return direction * magnitude
+
+# Which way the phrase-level melodic arch wants the walk to move right now -
+# up through the first half of a phrase, down through the second half.
+func _normal_arch_direction() -> int:
+	return 1 if (sequence.size() % NORMAL_PHRASE_LENGTH) * 2 < NORMAL_PHRASE_LENGTH else -1
 
 func _normal_next_pad_name() -> String:
 	var scale: Dictionary = SCALES[current_scale_index]
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
 	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
-	var degree := _normal_current_degree
+	# Riff shape seeding, phrase start only (mirrors _generate_music_bar_melody
+	# but one note at a time, since Normal's sequence grows one note per
+	# call) - state spans multiple calls via _normal_riff/_normal_riff_index.
+	if _normal_riff.is_empty() and sequence.size() % NORMAL_PHRASE_LENGTH == 0 and randf() < NORMAL_RIFF_CHANCE:
+		_normal_riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
+		_normal_riff_index = 0
+		_normal_riff_base = _normal_current_degree
+	var degree: int
+	if _normal_riff_index < _normal_riff.size():
+		degree = _reflect_degree(_normal_riff_base + int(_normal_riff[_normal_riff_index]))
+		_normal_riff_index += 1
+		if _normal_riff_index >= _normal_riff.size():
+			_normal_riff = []
+		_normal_current_degree = degree
+		_normal_last_direction = 0
+		_normal_repeat_streak = 1
+	else:
+		degree = _normal_current_degree
+		if not _is_resolution_degree(degree, scale) and randf() < NORMAL_ANCHOR_RETURN_CHANCE:
+			# Ghost return to a tonal-hierarchy-weighted tonic/third/fifth,
+			# same technique as Music Mode's anchor return - see
+			# _pick_resolution_degree() for why not always degree 0
+			# (docs/music-mode.md#note-distribution-bias-fix).
+			degree = _pick_resolution_degree(scale)
+			_normal_current_degree = degree
+			_normal_last_direction = 0
+			_normal_repeat_streak = 1
 	var delta := _normal_next_delta(max_leap)
 	var raw_target := degree + delta
 	var new_degree := _reflect_degree(raw_target)
@@ -2274,10 +2802,11 @@ func _normal_next_pad_name() -> String:
 	# (see docs/music-mode.md) - gives the ever-growing sequence periodic
 	# "landing points" instead of wandering indefinitely.
 	if (sequence.size() + 1) % NORMAL_PHRASE_LENGTH == 0:
-		play_degree = 0
-		_normal_current_degree = 0
+		play_degree = _pick_resolution_degree(scale)
+		_normal_current_degree = play_degree
 		_normal_repeat_streak = 1
 		_normal_last_direction = 0
+		_normal_riff = []
 	var ring_order: Array = scale.get("ring_order", [0, 1, 2, 3, 4, 5, 6, 7])
 	var ring_pos: int = ring_order.find(play_degree)
 	return pad_names[ring_pos if ring_pos != -1 else 0]
@@ -2416,7 +2945,8 @@ func _run_duet_response() -> void:
 	while i < sequence.size():
 		player_index = i
 		_duet_last_press = ""
-		_duet_note_deadline_ms = Time.get_ticks_msec() + int(DUET_NOTE_GRACE_SEC * 1000.0)
+		_duet_note_wait_start_ms = Time.get_ticks_msec()
+		_duet_note_deadline_ms = _duet_note_wait_start_ms + int(DUET_NOTE_GRACE_SEC * 1000.0)
 		while duet_mode and _duet_last_press == "" and (_duet_ability_pause or Time.get_ticks_msec() < _duet_note_deadline_ms):
 			await get_tree().process_frame
 		if not duet_mode:
@@ -2428,10 +2958,14 @@ func _run_duet_response() -> void:
 		var actual_time := float(Time.get_ticks_msec() - _duet_response_start_ms) / 1000.0
 		var offset := absf(actual_time - duet_pulse_times[i])
 		var timing_multiplier := DUET_LATE_MULT
+		_duet_ring_flash_color = Color(1.0, 0.45, 0.35)
 		if offset <= DUET_TIGHT_WINDOW:
 			timing_multiplier = DUET_TIGHT_MULT
+			_duet_ring_flash_color = Color(0.4, 1.0, 0.6)
 		elif offset <= DUET_GOOD_WINDOW:
 			timing_multiplier = DUET_GOOD_MULT
+			_duet_ring_flash_color = Color(1.0, 0.9, 0.4)
+		_duet_ring_flash_start_ms = Time.get_ticks_msec()
 		_register_hit(_duet_last_press, _duet_last_press_pos, timing_multiplier)
 		i += 1
 	if grand_finale_pending:
@@ -2462,11 +2996,14 @@ func _pause_duet_clock_end(started_at_ms: int) -> void:
 	var elapsed := Time.get_ticks_msec() - started_at_ms
 	_duet_response_start_ms += elapsed
 	_duet_note_deadline_ms += elapsed
+	_duet_note_wait_start_ms += elapsed
 	_duet_ability_pause = false
 
 # Returns true if forgiven/converted (caller should retry the same note
 # index or the round already got re-triggered), false if the run ended.
 func _handle_duet_miss() -> bool:
+	_duet_ring_flash_color = Color(1.0, 0.3, 0.3)
+	_duet_ring_flash_start_ms = Time.get_ticks_msec()
 	if grand_finale_pending:
 		_resolve_grand_finale_loss()
 		return false
@@ -2486,6 +3023,53 @@ func _handle_duet_miss() -> bool:
 			return false
 	_game_over()
 	return false
+
+func _process(_delta: float) -> void:
+	if duet_mode:
+		duet_ring.queue_redraw()
+
+# Draws Duet's timing cue as a dot that grows into a disc over the
+# Resonator: a filled circle, colored to match the pad the player needs to
+# hit, that grows from a point out to DUET_RING_RADIUS across the gap
+# between the previous pulse and the note currently due - reaching full
+# size exactly when `duet_pulse_times[player_index]` is due, the same clock
+# `_run_duet_response` grades against. Full size = press now; still small =
+# wait. Holds at full size (doesn't reset) if the player runs past the
+# deadline, so "it's overdue" reads as "still full, nothing changed" -
+# deliberately inert rather than adding another moving element to parse. A
+# short colored flash reports the grade (tight/good/late/miss) after the
+# press. Frozen (not cleared) during `_duet_ability_pause` so an ability use
+# doesn't yank the gauge forward the frame the clock resumes.
+func _on_duet_ring_draw() -> void:
+	var now_ms := Time.get_ticks_msec()
+	var flash_t := float(now_ms - _duet_ring_flash_start_ms) / 1000.0
+	if not duet_mode or not accepting_input or player_index >= sequence.size() or duet_pulse_times.is_empty():
+		if flash_t < DUET_RING_FLASH_SEC:
+			var idle_flash := _duet_ring_flash_color
+			idle_flash.a = 1.0 - flash_t / DUET_RING_FLASH_SEC
+			duet_ring.draw_arc(RING_CENTER, DUET_RING_RADIUS, 0.0, TAU, 48, idle_flash, 6.0, true)
+		return
+	var fill_color := Color(0.85, 0.85, 0.9)
+	var expected_pad: String = sequence[player_index]
+	if pads_by_name.has(expected_pad):
+		fill_color = pads_by_name[expected_pad].lit_color
+	fill_color.a = 0.9
+	# Anchored to when we started *waiting* on this note (real time), not to
+	# the fixed rhythmic grid - a slow previous press already ate into the
+	# grid's schedule, and anchoring to the grid would make the gauge open
+	# already full (or stay stuck full) for every note after that one.
+	var target_t: float = duet_pulse_times[player_index]
+	var start_t: float = duet_pulse_times[player_index - 1] if player_index > 0 else 0.0
+	var span: float = maxf(target_t - start_t, duet_step_duration)
+	if not _duet_ability_pause:
+		_duet_ring_frozen_now_t = float(now_ms - _duet_note_wait_start_ms) / 1000.0
+	var progress: float = clampf(_duet_ring_frozen_now_t / span, 0.0, 1.0)
+	if progress > 0.0:
+		duet_ring.draw_circle(RING_CENTER, DUET_RING_RADIUS * progress, fill_color)
+	if flash_t < DUET_RING_FLASH_SEC:
+		var flash_color := _duet_ring_flash_color
+		flash_color.a = 1.0 - flash_t / DUET_RING_FLASH_SEC
+		duet_ring.draw_arc(RING_CENTER, DUET_RING_RADIUS, 0.0, TAU, 48, flash_color, 6.0, true)
 
 func _on_pad_pressed(pad_name: String) -> void:
 	if zen_mode or music_mode:
@@ -2625,30 +3209,64 @@ func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.
 	hit_timestamps_ms.append(now_ms)
 	if hit_timestamps_ms.size() > PERFECT_PITCH_WINDOW + 1:
 		hit_timestamps_ms.pop_front()
-	var multiplier := 1.0 + float(combo - 1) * combo_growth
-	multiplier *= _fortissimo_multiplier()
-	multiplier *= _perfect_pitch_multiplier()
-	var points := int(round(10.0 * multiplier * timing_multiplier))
+	# Each step below tracks its own delta and, if it actually changed
+	# anything this hit, queues a cascading popup in that modifier's
+	# category color - so a build's modifiers are visibly, individually
+	# doing something on every hit, not just baked into one opaque total
+	# (mirrors Balatro's per-joker score reveal).
+	var popups: Array[Dictionary] = []
+	var base_multiplier := 1.0 + float(combo - 1) * combo_growth
+	var points := int(round(10.0 * base_multiplier * timing_multiplier))
+	var base_points := points
+
+	var fortissimo_mult := _fortissimo_multiplier()
+	if fortissimo_mult > 1.0:
+		var before := points
+		points = int(round(float(points) * fortissimo_mult))
+		popups.append({"text": "Fortissimo +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+
+	var pitch_mult := _perfect_pitch_multiplier()
+	if pitch_mult > 1.0:
+		var before := points
+		points = int(round(float(points) * pitch_mult))
+		popups.append({"text": "Perfect Pitch +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+
 	if player_index in gold_indices:
+		var before := points
 		points *= 3
+		popups.append({"text": "Golden Step +%d" % (points - before), "color": CATEGORY_COLORS["bonus_event"]})
+
 	if player_index == lucky_strike_index:
+		var before := points
 		points = int(round(points * float(_mod_val("lucky_strike", "value_mult"))))
 		lucky_strike_index = -1
 		_show_toast("Lucky Strike!")
-	points += _harmonic_chain_bonus_points(points)
-	points = int(round(points * (1.0 + score_bonus_percent)))
+		popups.append({"text": "Lucky Strike +%d" % (points - before), "color": CATEGORY_COLORS["bonus_event"]})
+
+	var chain_bonus := _harmonic_chain_bonus_points(points)
+	if chain_bonus != 0:
+		points += chain_bonus
+		popups.append({"text": "Harmonic Chain +%d" % chain_bonus, "color": CATEGORY_COLORS["multiplier"]})
+
+	if score_bonus_percent > 0.0:
+		var before := points
+		points = int(round(points * (1.0 + score_bonus_percent)))
+		popups.append({"text": "Resonance +%d" % (points - before), "color": CATEGORY_COLORS["multiplier"]})
+
 	unbanked_points += points
 	if _completed_repeated_chunk(player_index) and equipped_modifiers["bonus_event"] == "motif_bonus":
-		var bonus := int(_mod_val("motif_bonus", "amount"))
-		unbanked_points += bonus
-		_spawn_score_popup(click_pos + Vector2(0, -20), "Motif +%d" % bonus, Color(0.8, 0.6, 1.0))
+		var motif_bonus := int(_mod_val("motif_bonus", "amount"))
+		unbanked_points += motif_bonus
+		popups.append({"text": "Motif +%d" % motif_bonus, "color": CATEGORY_COLORS["bonus_event"]})
+
 	var cur_wave: int = _current_wave_length()
 	if cur_wave > best_streak_this_run:
 		best_streak_this_run = cur_wave
 	_register_best(_current_round(), score, combo)
 	_update_score_labels()
 	_punch(combo_label)
-	_spawn_score_popup(click_pos, "+%d" % points, pads_by_name[pad_name].lit_color)
+	_spawn_score_popup(click_pos, "+%d" % base_points, pads_by_name[pad_name].lit_color)
+	_spawn_score_popup_cascade(click_pos, popups)
 	_spawn_burst(click_pos, pads_by_name[pad_name].lit_color)
 	_screen_shake(3.0, 0.12)
 
@@ -3206,12 +3824,15 @@ func _update_score_labels() -> void:
 	else:
 		combo_label.text = ""
 	var total := _cash_out_total()
+	var under_floor := unbanked_points < cash_out_floor
 	if grand_finale_pending:
 		cash_out_button.text = "Clear the round! (x%.1f)" % float(_mod_val("grand_finale", "mult"))
+	elif under_floor:
+		cash_out_button.text = "Cash Out (need %d more)" % (cash_out_floor - unbanked_points)
 	else:
 		cash_out_button.text = "Cash Out (+%d)" % total if total > 0 else "Cash Out"
 	if accepting_input:
-		cash_out_button.disabled = grand_finale_pending or total <= 0
+		cash_out_button.disabled = grand_finale_pending or total <= 0 or under_floor
 	_refresh_loadout_hud()
 
 func _set_pads_disabled(value: bool) -> void:
@@ -3222,7 +3843,8 @@ func _set_pads_disabled(value: bool) -> void:
 	# mid-animation into an inconsistent state. Also stays off until there
 	# is something to bank (a hit this streak), so the queued next round
 	# can't inflate the payout before the player has acted.
-	cash_out_button.disabled = value or (_cash_out_total() <= 0 and not grand_finale_pending)
+	var under_floor := unbanked_points < cash_out_floor
+	cash_out_button.disabled = value or grand_finale_pending or under_floor or _cash_out_total() <= 0
 	_refresh_loadout_hud()
 
 func _play_round_clear_beat() -> void:
@@ -3264,6 +3886,21 @@ func _spawn_score_popup(pos: Vector2, text: String, color: Color) -> void:
 	t.tween_property(label, "position:y", label.position.y - 40, 0.6)
 	t.tween_property(label, "modulate:a", 0.0, 0.6)
 	t.chain().tween_callback(label.queue_free)
+
+# Fires each entry's popup a beat after the last, staggered upward and
+# slightly wider each time, so a hit with several modifiers active reads as
+# a legible cascade (base amount, then each bonus in turn) instead of a
+# stack of overlapping labels landing all at once.
+func _spawn_score_popup_cascade(pos: Vector2, entries: Array[Dictionary]) -> void:
+	var delay := 0.16
+	var offset := Vector2(24, -22)
+	for entry in entries:
+		var text: String = entry["text"]
+		var color: Color = entry["color"]
+		var spawn_pos := pos + offset
+		get_tree().create_timer(delay).timeout.connect(_spawn_score_popup.bind(spawn_pos, text, color))
+		delay += 0.16
+		offset += Vector2(24, -22)
 
 func _spawn_burst(pos: Vector2, color: Color) -> void:
 	var particles := CPUParticles2D.new()
