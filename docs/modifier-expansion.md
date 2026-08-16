@@ -89,12 +89,34 @@ modifiers equally.
   (variance between the intervals of your own consecutive hits), a real signal in Normal/Chaos with
   no external tiers needed; in Duet it stacks alongside the existing tight/good/late accuracy tiers
   as a second, complementary dimension.
-- **Grounding Resonance** — generalized from Chaos-only to reducing *any* mode's per-round
-  escalation rate (Chaos's speed/reshuffle ramp, Duet's tempo ramp). Normal has no ramp to slow, so
-  it's naturally low-value there — expected, same pattern as Slow Fade being disproportionately
-  useful in Chaos without being inert elsewhere.
-- **Metronome** and **Rubato** were already mode-agnostic mechanically, just under-described as
-  Duet-flavored extras — wording only.
+- **Grounding Resonance** — the original "reduces any mode's per-round escalation rate" pitch turned
+  out not to hold up under this section's own audit standard: Normal Mode has no ramp at all (not
+  just a low-value one), so a full Normal-mode run made this pick a complete no-op, not merely
+  "naturally low-value there." **Revision note (later pass, same modifier-audit initiative):**
+  redesigned again, this time to something that's identically real in Normal/Chaos/Duet by
+  construction — see its roster entry below.
+- **Steady Hands** and **Rubato** — audited in a later pass and found to have the mirror-image bug:
+  both scale playback pacing in `_play_sequence()` (Normal/Chaos) but were never wired into
+  `_play_duet_call()`, so both were dead picks for an entire Duet run despite reading as
+  mode-agnostic on paper. **Fixed** — `_play_duet_call()` now scales its own local step duration by
+  the same `sequence_speed_multiplier × _rubato_speed_factor()` factors, without touching
+  `duet_step_duration` itself (the response phase still grades timing against the original tempo
+  grid, so the fix only changes what you *watch*, never what you're graded against).
+- **Metronome** was already mode-agnostic mechanically, just under-described as a Duet-flavored
+  extra — wording only.
+- **Echo Chamber's Peek and Quick Rewind's Rewind** (see their entries below) were both flatly
+  excluded from Duet at first ship — Peek's "preview the next note" and the original automatic
+  rewind both interact with Duet's live, timed response window in ways that seemed unsafe to just
+  turn on. **Fixed properly instead of left excluded**: both abilities now work in Duet by pausing
+  the response phase's clock while they play (`_pause_duet_clock_start`/`_pause_duet_clock_end`) —
+  the current note's grace deadline and the fixed pulse-timing reference both shift forward by
+  exactly how long the ability took, so spending a charge mid-response can't cost a miss or skew the
+  timing grade. **Grand Finale** got the same full-Duet treatment: `_handle_duet_miss()` now checks
+  a pending gamble before falling into normal defense-mod handling (same bypass Double Down already
+  used), and `_run_duet_response()` checks it on a phrase's natural completion. The governing
+  principle, stated plainly this pass: **every modifier should work in every scored mode** —
+  "naturally low-value in mode X" is an acceptable audit finding, "flatly dead/excluded in mode X"
+  is not, and should be fixed or redesigned rather than documented as a known gap.
 - **Harmonic Chain** and **Motif Bonus** depend on the (not-yet-implemented) musical-chunking
   generator being shared across Normal/Chaos's sequences *and* Duet's call-phrases, not
   Normal/Chaos-only.
@@ -121,16 +143,16 @@ was checked against this — none of them auto-bank or bypass the Cash Out actio
 Finale's redesigned gamble (still requires an explicit player action to resolve, win or lose).
 
 **Shared definition**, referenced by several entries below: **"complete a streak" / "waves
-completed"** means a voluntary cash-out (win *or* lose a Grand Finale gamble both count, since both
-resolve and reset the streak). Only a true run-ending miss (charges exhausted, and not otherwise
-converted by Second Wind — see below) doesn't count.
+completed"** means a voluntary cash-out (a Grand Finale win counts too, since it is a player-triggered
+streak end). A Second Wind save does **not** count — it is insurance, not a wave. A true run-ending
+miss also doesn't count.
 
 ## Categories & roster
 
 Each category = one equip slot. A *different* modifier into a filled slot prompts swap-or-skip; the
 *same* modifier into its own filled slot levels it up (see "Leveling" above).
 
-### Multiplier
+### Dynamics
 
 Score-scaling effects. All six compound into cash-outs, not just per-hit score — confirmed in the
 shipped formula (`docs/scoring-escalation.md`'s `_cash_out_streak_bonus()`, which already includes
@@ -189,7 +211,7 @@ where Resonance's bonus wasn't reaching it).
    unchanged: survive 10 waves in a single run (a real, countable run stat, unaffected by the cap's
    removal).
 
-### Defense
+### Grace
 
 Currently the thinnest category in the live game (Safety Net is its only member).
 
@@ -221,7 +243,8 @@ just for a slightly different reason than when it was written.
    through 15 total granted charges across its leveling history, though some may already be spent).
    **L5 twist:** the shipped hint-flash (re-flashing the correct pad before a forgiven retry) shows
    the *next two* upcoming notes instead of just the one that was missed — at maximum investment,
-   forgiveness comes with real foresight, not just a rescue.
+   forgiveness comes with real foresight, not just a rescue. Exhausted charges do not unequip
+   Safety Net; the Defense slot stays filled at 0 until a level-up grants more.
 2. **Echo Chamber** *(new — full redesign, was a near-duplicate of Safety Net's new hint behavior)*
    — reframed from *reactive* (forgive + hint on a miss, which baseline Safety Net now already
    does) to **proactive**: a limited "Peek" action the player can spend *before* attempting a step
@@ -233,6 +256,9 @@ just for a slightly different reason than when it was written.
    just the next note — it reveals the next *three*, for the cost of a single charge. A maxed Echo
    Chamber turns from "confirm one note at a time" into "read ahead," a real step up in what the
    resource buys, not just more of it.
+   **Revision note:** originally excluded from Duet entirely (the Peek button hard-returned on
+   `duet_mode`). Fixed — Peek now works mid-response in Duet too, pausing the response clock for
+   its duration so spending a charge can't cost a miss (see the cross-mode audit above).
 3. **Muffled Strike** *(new — full redesign, original premise is dead code per the note above)* —
    reframed as a **passive, probabilistic backup under `mistake_charges`**: when a miss would
    otherwise be fatal (no charges left), there's a chance it's forgiven anyway — unlimited,
@@ -251,31 +277,46 @@ just for a slightly different reason than when it was written.
    code as a result; it's accurate as a description of what happens, just not as a *contrast* to
    L1-4 (which already behave the same way on that specific point). Left as-written above rather
    than edited, since it's a harmless overstatement rather than a wrong one.
-4. **Grounding Resonance** *(new)* — slows any mode's *intra-streak* per-round escalation rate
-   (Chaos's speed/reshuffle ramp, Duet's tempo ramp) by a flat percentage; Normal has no ramp to
-   slow, so it's naturally low-value there, same pattern as Slow Fade in Chaos. Explicitly scoped
-   to in-streak pressure only — confirmed still correct under the shipped no-cap model, it never
-   touched the cash-out formula and doesn't need to change now that there's no cap to protect
-   either. Leveled: **10% / 18% / 25% / 32% / 40%** slower ramp at L1-L5 (diminishing-returns
-   curve — deliberately front-loaded so early levels feel like the biggest relief). No L5 twist —
-   this is a pure pressure-relief pick with nothing to qualitatively escalate into.
+4. **Grounding Resonance** *(redesigned a second time — the "slows the ramp" mechanic above shipped,
+   then failed its own cross-mode audit)* — the original pitch generalized it from Chaos-only to
+   "slows any mode's per-round escalation ramp," but Normal Mode was found to have no ramp at all,
+   not just a low-value one: a full Normal-mode run made this pick a complete no-op, contradicting
+   the audit standard the rest of this doc holds every modifier to. **New mechanic, identically real
+   in every mode:** a fatal miss (one that would otherwise go to `_game_over()` with the streak's
+   `unbanked_points` forfeited outright) banks a percentage of that unbanked pool instead of losing
+   it all — same "protect the unbanked pool, not just run-continuation" spirit Safety Net already
+   established, just triggered on the *unforgiven*, run-ending miss instead of an ordinary one.
+   Leveled: **10% / 18% / 25% / 32% / 40%** of the forfeited pool banked at L1-L5. No L5 twist —
+   still a pure loss-mitigation pick with nothing to qualitatively escalate into.
+   **Implementation note:** `_game_over()` in `Main.gd` applies the refund (reading
+   `grounding_resonance_pct`) before `final_score` is captured, so it lands in the run's recorded
+   score. The old ramp-slowing code (`_generate_duet_phrase()`'s BPM ramp, `_play_sequence()`'s
+   Chaos speed ramp) had its `grounding_resonance_pct` factor removed entirely.
 5. **Second Wind** *(power, milestone-gated — full redesign, was redundant with baseline
    forgiveness)* — the original pitch ("once per wave, a miss triggers an early cash-out instead of
    losing unbanked progress") is now just what *any* forgiven miss already does by default (see
    `docs/scoring-escalation.md`'s forgiveness-protects-points behavior) — not a distinct pick
-   anymore. **New mechanic: a true last resort.** When a miss would otherwise be fatal (no charges
-   left, and Muffled Strike either isn't equipped or didn't trigger), Second Wind converts *that
-   specific miss* into a forced cash-out at the streak's current value instead of ending the run —
-   the streak ends (banking whatever was unbanked, same formula as a normal cash-out) but the *run*
-   continues into a fresh streak, at the cost of consuming one of Second Wind's own limited uses.
-   This is meaningfully different from Muffled Strike: Muffled Strike (if it triggers) keeps the
-   streak *alive*; Second Wind always *ends* the streak, but is deterministic within its use count
-   rather than a coin flip. Levels set uses per run: **1 / 2 / 3 / 4 / 5** uses. **L5 twist:** at
-   maximum investment, triggering Second Wind also pays a "clutch save" bonus — the forced cash-out
-   is worth an extra 25% — so at L5 a near-death moment, resolved with your last available save,
-   pays out *more* than an ordinary cash-out at the same streak length would have, not less.
-   Suggested unlock unchanged: complete a wave with zero misses first (proving you don't *need* the
-   safety net before the game hands you the strongest version of one).
+   anymore. **New mechanic: a true last resort, not a second Cash Out.** When a miss would otherwise
+   be fatal, Second Wind keeps the run alive and resets the streak, at the cost of one use. It is
+   deliberately worse than a voluntary cash-out so a refill cannot loop:
+
+   - L1–4 bank **hit points only** (`unbanked_points`). No quadratic streak bonus, no
+     `waves_completed` / Crescendo credit.
+   - Combo halves, same as any other miss.
+   - **L5 twist:** the save pays the full cash-out total plus a 25% clutch bonus — the mastery
+     payoff for committing to this pick.
+   - **Refill:** a *voluntary* cash-out (or Grand Finale win) at **Streak 5+** (the same `Streak N`
+     number on the round HUD) restores one use, capped at the current level. The in-game
+     description states this outright. A forced save never refills — the save is itself a
+     cash-out-shaped event, so it cannot restock itself.
+   - Uses still scale **1 / 2 / 3 / 4 / 5** by level; exhausting them does not unequip the
+     modifier. The slot stays filled at 0 until a qualifying cash-out or a level-up.
+
+   Distinct from Muffled Strike: Muffled Strike (if it triggers) keeps the streak *alive*; Second
+   Wind always *ends* the streak, but is deterministic within its use count rather than a coin flip.
+   Suggested unlock unchanged: complete a wave with zero misses first.
+   **Implementation note:** `_force_cash_out_from_second_wind()` / `_try_refill_second_wind()` in
+   `Main.gd`; threshold constant `SECOND_WIND_REFILL_STREAK = 5`.
 6. **Unbreakable** *(power, milestone-gated)* — the first miss(es) each streak are forgiven free, no
    charge cost. Leveled: level *L* forgives the first *L* misses of each streak for free
    (**1 / 2 / 3 / 4 / 5**). No separate L5 twist — the numeric curve itself (going from "one free
@@ -290,9 +331,24 @@ Pacing/timing effects.
 1. **Steady Hands** *(existing, shipped as flat uncapped multiplicative stacking today)* — sequence
    plays back slower. Leveled target: **8% / 15% / 22% / 30% / 40%** slower at L1-L5 (replacing the
    shipped `×1.15` per pick, uncapped). No L5 twist.
-2. **Patient Ear** *(new)* — longer pause before your turn starts. Leveled: **+0.3s / +0.5s / +0.8s
-   / +1.1s / +1.5s**. No L5 twist — a pure prep-time buffer with nothing to qualitatively escalate
-   into.
+   **Revision note:** found dead in Duet during a later cross-mode audit (only wired into
+   `_play_sequence()`, never `_play_duet_call()`) — fixed, see the cross-mode audit section above.
+2. **Quick Rewind** *(replaces Patient Ear — that pick shipped, then failed its own cross-mode audit
+   for a different reason: it was universally inert, not mode-specific)* — Patient Ear's "longer
+   pause before your turn starts" turned out to have nothing to act on: the game has no timeout or
+   reaction-speed penalty anywhere, so extra idle time before an already-untimed turn didn't give
+   the player anything they didn't already have. **New mechanic:** an on-demand, charge-gated
+   ability (a "Rewind" button alongside Peek/Gamble in the loadout HUD) that replays the *entire*
+   current sequence (Normal/Chaos) or call phrase (Duet) at a fast, level-scaled speed. Unlike the
+   original always-on pause, this is a real resource: leveling raises both replay speed (still
+   "quick," but more perceivable at higher levels — **6.0x / 4.5x / 3.5x / 2.5x / 1.8x**) and the
+   charge count (**1 / 2 / 3 / 4 / 5** uses), refilled the same way as Second Wind/Grand Finale — a
+   voluntary cash-out (or Grand Finale win) at **Streak 5+** restores one use, capped at the current
+   level. No L5 twist beyond the numeric curve. Works in Duet: using it mid-response pauses the
+   response phase's clock for its duration (see the cross-mode audit above), so it can't cost a miss
+   or skew the timing grade.
+   **Implementation note:** `_use_quick_rewind()`/`_quick_rewind_sequence()`/
+   `_try_refill_quick_rewind()` in `Main.gd`; threshold constant `QUICK_REWIND_REFILL_STREAK = 5`.
 3. **Metronome** *(new)* — subtle rhythmic pulse cue during playback, a perceptual aid equally
    useful in Normal/Chaos/Duet, pairs naturally with Perfect Pitch's cadence bonus. Leveled: cue
    clarity/salience increases at each level (by-eye tuning, same status as the shimmer shader).
@@ -314,8 +370,10 @@ Pacing/timing effects.
    speed otherwise); at L5 it becomes genuinely two-directional, rewarding a hot streak with actual
    speed instead of just refusing to punish a cold one. Suggested unlock unchanged: reach a 25-combo
    in a single run.
+   **Revision note:** found dead in Duet alongside Steady Hands during the same cross-mode audit
+   pass — fixed the same way (see the cross-mode audit section above).
 
-### Bonus-Event
+### Ornament
 
 Special one-off scoring moments.
 
@@ -344,23 +402,33 @@ Special one-off scoring moments.
 5. **Motif Bonus** *(new)* — flat bonus for correctly landing a full repeated motif/chunk, the
    direct reward-side counterpart to Harmonic Chain and Breath Mark. Leveled: flat bonus amount
    scales up per level (by-eye tuning). No L5 twist.
-6. **Grand Finale** *(power, milestone-gated — full redesign, was cap-relative)* — **new mechanic:**
-   an opt-in **"Double or Nothing"** gamble that sits alongside the normal Cash Out button once
-   equipped. Instead of banking normally, the player can wager the entire current unbanked pool on
-   landing exactly one more correct note: win it, and the wagered total is banked at a multiplier
-   (the streak ends either way, same as a normal cash-out — this is a supercharged cash-out
-   variant, not a separate risk layered on top of the run itself); miss it, and the wagered
-   unbanked pool is forfeited (the streak still ends, but the run does not — this miss is
-   self-contained to the wager and doesn't consume a Safety Net/Second Wind/Muffled Strike
-   resource, since it isn't a normal sequence miss). Levels set the payout multiplier: **1.5x /
-   1.8x / 2.2x / 2.7x / 3.5x**. **L5 twist:** missing the gamble note is forgiven for free (the
-   wager itself is insured once per gamble, at no charge cost) — at maximum investment, the "double
-   or nothing" bet stops being able to actually cost you the wager, turning Grand Finale from a real
-   gamble into a guaranteed-multiplier cash-out variant once fully mastered, which is the intended
-   capstone feeling for this pick specifically (a Bonus-Event power modifier should eventually feel
-   like a cheat code for the category's whole "special one-off moment" identity). Suggested unlock
-   unchanged: cash out 5 times in a single run (the "complete 5 waves" language restated in shipped
-   terms).
+6. **Grand Finale** *(power, milestone-gated — redesigned twice: first from the rejected wave-cap
+   mechanic, then again from a single-note gamble to a round-scoped one)* — **shipped as an
+   opt-in "Double or Nothing" gamble**, but not on the Cash Out button itself: a separate "Gamble"
+   button that appears alongside Cash Out once equipped, so pressing Cash Out always just banks
+   normally and the gamble is a deliberate second action, never an accidental one. The wager scope
+   also changed from the original pitch: rather than betting on landing *exactly one more correct
+   note*, Grand Finale now wagers the current unbanked pool on **completing the rest of the round
+   already in progress** — a real, if-you-can-clear-it swing, not a single coin-flip press. Winning
+   (clearing the round) banks the wager at a multiplier; missing anywhere in it forfeits the wager
+   and forces a hard streak reset, bypassing Defense-category forgiveness entirely (the same
+   self-contained-wager bypass Double Down already used, so a miss here still never consumes a
+   Safety Net/Second Wind/Muffled Strike resource). Levels set the payout multiplier: **1.5x / 1.8x
+   / 2.2x / 2.7x / 3.5x**. **Charges, not unlimited attempts:** unlike the original always-available
+   pitch, each gamble now spends one charge from a pool (**1 / 1 / 2 / 2 / 3** uses at L1-L5,
+   granted on level-up), refilled the same way as Second Wind — a voluntary cash-out at **Streak
+   5+** restores one use, capped at the current level. **L5 twist, redefined for the round-scoped
+   wager:** "insured" no longer means a free retry on the same note — a miss during an insured
+   gamble banks the wager anyway (at no multiplier, just as if you'd cashed out normally) *and*
+   refunds the spent charge, so a maxed Grand Finale genuinely cannot cost you anything, only fail
+   to pay off; the capstone feeling (this pick becomes a cheat code once fully mastered) is
+   unchanged from the original design intent, just re-grounded in the new mechanic. Works fully in
+   Duet: `_handle_duet_miss()` checks a pending gamble before normal defense handling, and
+   `_run_duet_response()` resolves a win on the phrase's natural completion. Suggested unlock
+   unchanged: cash out 5 times in a single run.
+   **Implementation note:** `_start_grand_finale_gamble()`/`_resolve_grand_finale_win()`/
+   `_resolve_grand_finale_loss()`/`_try_refill_grand_finale()` in `Main.gd`; threshold constant
+   `GRAND_FINALE_REFILL_STREAK = 5`.
 
 ## Milestone gating
 
@@ -370,11 +438,11 @@ reusing the Round/Score/Combo ladder, keeping it a distinct later-game progressi
 
 | Power modifier | Category | Suggested unlock |
 |---|---|---|
-| Fortissimo | Multiplier | Survive 10 waves in one run |
-| Unbreakable | Defense | Complete a wave with zero misses |
-| Second Wind | Defense | Complete a wave with zero misses *(shares Unbreakable's gate — both are Defense, only one can ever be equipped, so this isn't a race, just two different rewards for the same proof of skill)* |
+| Fortissimo | Dynamics | Survive 10 waves in one run |
+| Unbreakable | Grace | Complete a wave with zero misses |
+| Second Wind | Grace | Complete a wave with zero misses *(shares Unbreakable's gate — both are Grace, only one can ever be equipped, so this isn't a race, just two different rewards for the same proof of skill)* |
 | Rubato | Tempo | Reach a 25-combo in one run |
-| Grand Finale | Bonus-Event | Cash out 5 times in one run |
+| Grand Finale | Ornament | Cash out 5 times in one run |
 
 Note Second Wind is now also milestone-gated (it wasn't in the original roster, which had only one
 power pick per category) — its redesign above turns it into a genuinely strong, limited-use
@@ -387,11 +455,11 @@ same-category stacking. Reassessed against every redesign above — two of the f
 needed real changes, not just relabeling.
 
 **Marathon Runner** — *Crescendo* + *Second Wind* + *Rubato* + *Encore*
-Still holds, arguably stronger now: never really fail (Second Wind's redesign is an even better fit
-for "safety net" than its original version), bank consistently, let Crescendo's multiplier climb
-purely off wave count while Rubato keeps pace forgiving and Encore pads every cash-out. A level-5
-Crescendo is this build's real payoff moment — the multiplicative compounding is what turns
-"consistent" into "exponential" late in a long run.
+   Still holds, with the save nerfed so it cannot feed Crescendo: bank consistently, spend Second
+   Wind as a last resort (hit points only unless L5), refill a use by cashing out at Streak 5+,
+   let Crescendo climb off *voluntary* waves while Rubato keeps pace forgiving and Encore pads
+   every real cash-out. A level-5 Crescendo is this build's real payoff moment — the multiplicative
+   compounding is what turns "consistent" into "exponential" late in a long run.
 
 **Precision Virtuoso** — *Perfect Pitch* + *Muffled Strike* + *Metronome* + *Double Down*
 Mostly holds; Muffled Strike's redesign (passive probabilistic backup) fits this build's
@@ -411,18 +479,19 @@ Rewritten philosophy: a milestone-gated "boss build" across three categories, no
 buildable since Fortissimo and Grand Finale both have real mechanics again. Ride every streak past
 your own personal best (Fortissimo), never really lose a streak to one careless slip
 (Unbreakable), and cap it off by wagering the whole unbanked pool on Grand Finale's Double or
-Nothing — at level 5, that wager can no longer actually lose, turning the build's capstone move
-into a guaranteed multiplier once fully earned. This is the build the milestone gating is
-explicitly trying to make players *earn*, not stumble into.
+Nothing — clearing the rest of the round pays out at the level's multiplier, and at level 5 a miss
+can't actually cost the wager either (it banks anyway, and the spent charge refunds), turning the
+build's capstone move into a guaranteed-payoff swing once fully earned. This is the build the
+milestone gating is explicitly trying to make players *earn*, not stumble into.
 
 **Deep Specialist** *(new — a fifth build, specifically about the leveling system)*
 No fixed loadout — the build *is* the decision to max one category-defining pick to level 5 instead
 of spreading four different category picks thin. The pitch: a level-5 Crescendo, Echo Chamber,
 Rubato, or Grand Finale each fundamentally change how their slot plays (multiplicative compounding,
-three-note lookahead, two-directional tempo, a can't-lose gamble) in a way four separate level-1
-picks across categories never could. Worth calling out as its own build entry because the leveling
-system is new enough this session that "should I diversify or commit" deserves to be a named
-strategic question, not just an emergent property players discover on their own.
+three-note lookahead, two-directional tempo, a wager that can no longer actually lose) in a way
+four separate level-1 picks across categories never could. Worth calling out as its own build entry
+because the leveling system is new enough this session that "should I diversify or commit" deserves
+to be a named strategic question, not just an emergent property players discover on their own.
 
 ## Open items
 
@@ -446,11 +515,13 @@ strategic question, not just an emergent property players discover on their own.
   hard constraint at implementation time, not just a design note — same flag as before, now doubly
   true with Echo Chamber's proactive Peek and Second Wind's forced-cash-out path both needing to
   respect it too.
-- **Grand Finale's and Double Down's gamble-note handling both need a shared implementation note**:
-  neither should consume a Safety Net/Echo Chamber/Muffled Strike/Second Wind resource on their own
-  internal miss — they're self-contained wagers with their own win/lose resolution, not normal
-  sequence misses. Worth a code comment at implementation time given how easy it'd be to
-  accidentally wire a gamble-note miss into the general `_on_pad_pressed` forgiveness branch.
+- ~~Grand Finale's and Double Down's gamble-note handling both need a shared implementation note~~
+  **Resolved.** Both are self-contained wagers that bypass `_resolve_defense_on_miss()` entirely on
+  their own miss (`_forfeit_streak_from_double_down()`, `_resolve_grand_finale_loss()`) — confirmed
+  in both `_on_pad_pressed` (Normal/Chaos) and `_handle_duet_miss()` (Duet), so neither can
+  accidentally consume a Safety Net/Echo Chamber/Muffled Strike/Second Wind resource. Grand Finale's
+  wager scope changed from a single note to the rest of the current round in a later pass (see its
+  roster entry above) — the bypass-defense-mods behavior itself didn't change.
 - **Second Wind and Unbreakable sharing a milestone gate** (both "complete a wave with zero
   misses") is a deliberate choice (see the Milestone Gating note above) but hasn't been checked
   against whether the game's unlock-toast UI reads sensibly when a single achievement unlocks two

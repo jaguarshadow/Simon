@@ -34,7 +34,7 @@ forgiveness perk is active).
   softer shake and a gentle amber screen flash (deliberately mellow, not a
   harsh "fail" sting, to keep the game feeling calm).
 - Every 3rd round, play pauses and offers a choice of 3 random **modifiers**, drawn from a
-  24-strong roster across four categories (Multiplier, Defense, Tempo, Bonus-Event) — **one
+  24-strong roster across four categories (Dynamics, Grace, Tempo, Ornament) — **one
   equipped per category at a time**, Hades-style. Picking the modifier already in a slot levels it
   up (1→5); picking a different one prompts a swap-or-skip choice instead of silently replacing or
   stacking. Full roster and rationale: `docs/modifier-expansion.md`.

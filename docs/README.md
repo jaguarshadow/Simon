@@ -10,8 +10,8 @@ just read); they're the reasoning that isn't visible from the code alone.
 - [scales-palettes-themes.md](scales-palettes-themes.md) — the three unlock tracks and `ring_order`
 - [audio.md](audio.md) — procedural synthesis, buses, the ambient layer
 - [music-mode.md](music-mode.md) — the generative Euclidean-rhythm + melody-walk system, in depth
-- [modifier-expansion.md](modifier-expansion.md) — proposed 24-modifier roster/categories (not yet implemented)
-- [scoring-escalation.md](scoring-escalation.md) — wave reset, modifier slots, musical chunking (design only, not yet implemented)
+- [modifier-expansion.md](modifier-expansion.md) — 24-modifier roster, slot system, leveling curves
+- [scoring-escalation.md](scoring-escalation.md) — cash-out economy, wave/streak reset, what persists
 
 Two documents outside `/docs` are the source of truth for scope:
 - `GAME_OVERVIEW.md` — the frozen core design (rules, modes, scoring, scales, palettes)

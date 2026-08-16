@@ -10,6 +10,7 @@ const FLAT_SHIMMER_SHADER := preload("res://shaders/flat_shimmer.gdshader")
 
 var shader_material: ShaderMaterial = null
 var _is_flat_shimmer := true
+var _glow_tween: Tween = null
 
 func _ready() -> void:
 	_set_color(base_color)
@@ -57,10 +58,16 @@ func clear_shader_skin() -> void:
 	material = mat
 
 func _set_glow(value: float) -> void:
+	if _glow_tween:
+		_glow_tween.kill()
+		_glow_tween = null
 	shader_material.set_shader_parameter("glow", value)
 
 func _tween_glow_out() -> void:
+	if _glow_tween:
+		_glow_tween.kill()
 	var t := create_tween()
+	_glow_tween = t
 	var mat := shader_material
 	t.tween_method(func(v): mat.set_shader_parameter("glow", v), 1.0, 0.0, 0.3)
 

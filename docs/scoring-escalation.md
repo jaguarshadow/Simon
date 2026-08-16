@@ -99,14 +99,23 @@ only — a fluky in-progress streak can't set a new best until it's actually ban
 ### Cash-out formula (as shipped)
 
 ```gdscript
+func _current_wave_length() -> int:
+	var queued := duet_wave_round if duet_mode else sequence.size()
+	if current_round_has_hit:
+		return queued
+	return max(0, queued - 1)
+
 func _cash_out_streak_bonus() -> int:
-	var s := _current_wave_length()  # sequence.size() (Normal/Chaos) or duet_wave_round (Duet)
+	var s := _current_wave_length()
 	var multiplier := 1.0 + float(combo - 1) * combo_growth
 	return int(round(CASHOUT_QUADRATIC_K * float(s) * float(s) * multiplier))
-
-func _cash_out_total() -> int:
-	return unbanked_points + _cash_out_streak_bonus()
 ```
+
+`_next_round()` appends the new note (or increments `duet_wave_round`) *before* the player acts, so
+`sequence.size()` / `duet_wave_round` are one step ahead of anything earned. Cash-out bonus, Fortissimo,
+and the button label all read `_current_wave_length()` instead, which stays on the previous completed
+length until a hit lands this round (`current_round_has_hit`). The round HUD's `(Streak N)` still
+shows the queued length — that's "what you're facing," not "what you've banked."
 
 `CASHOUT_QUADRATIC_K = 2.0` is a placeholder tuning constant — same by-eye/balance-pass status as
 the shimmer shader parameters and other numeric placeholders elsewhere in these docs, not a
@@ -216,7 +225,7 @@ exists in the current file — this section is design history, not a description
 
 ## Interaction with the modifier slot system
 
-The slot system itself (four categories — Multiplier / Defense / Tempo / Bonus-Event, one equipped
+The slot system itself (four categories — Dynamics / Grace / Tempo / Ornament, one equipped
 modifier per category, swap-or-skip on a re-pick) is specified in full in
 [modifier-expansion.md](modifier-expansion.md#categories--roster); this section is only about how
 it plugs into the cash-out economy above. None of this is implemented yet.
@@ -242,8 +251,10 @@ it plugs into the cash-out economy above. None of this is implemented yet.
   - **Fortissimo, Second Wind, and Grand Finale** — all three were designed against the now-rejected
     cap and have been fully redesigned in `modifier-expansion.md` (self-referential "beat your own
     best streak," a true last-resort forced-cash-out on an otherwise-fatal miss, and an opt-in
-    "Double or Nothing" gamble layered on the Cash Out button, respectively). None of them key off a
-    cap anymore.
+    "Double or Nothing" gamble, respectively). None of them key off a cap anymore. Grand Finale's
+    gamble later moved off the Cash Out button onto its own separate "Gamble" action once it became
+    charge-limited, so Cash Out always just banks normally — see `modifier-expansion.md` for the
+    current mechanic.
   - **Echo Chamber** was also redesigned (not cap-related, but redundant with Safety Net's new
     hint-flash behavior) into a proactive "Peek" the player spends *before* an uncertain step,
     distinct from Safety Net's reactive, only-on-failure protection.

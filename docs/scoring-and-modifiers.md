@@ -36,7 +36,9 @@ Cashing out adds `unbanked_points` plus a bonus that scales quadratically with h
 streak has run (`_cash_out_streak_bonus()`) into `score`, zeroes `unbanked_points`, and resets the
 streak (sequence truncated to 0 notes for Normal/Chaos, so the next round starts at exactly 1 note;
 `duet_wave_round` zeroed for Duet). Combo, `combo_growth`, and all modifier state persist through a
-cash-out untouched.
+cash-out untouched. Streak length for the bonus is the last **earned** length (`_current_wave_length()`):
+the queued next round is not counted until the player lands a hit on it, so the Cash Out total
+cannot jump before a turn has been taken.
 
 This means `score` can now sit flat for an entire streak and jump on cash-out — deliberate, and the
 reason a miss can cost something beyond the combo reset described below.
@@ -57,7 +59,7 @@ what's actually live in `Main.gd`:
 Every `MODIFIER_ROUND_INTERVAL` (3) rounds, `_offer_modifier_choice()` presents 3 random modifiers
 drawn from all 24 (power modifiers only appear once their milestone is met; anything already at
 level 5 stops appearing) and blocks on a signal (`_modifier_picked`) until the player taps one.
-Modifiers are grouped into four categories (Multiplier, Defense, Tempo, Bonus-Event) with **one
+Modifiers are grouped into four categories (Dynamics, Grace, Tempo, Ornament) with **one
 equipped modifier per category at a time** (`equipped_modifiers`):
 
 - Picking the modifier **already equipped** in its category's slot levels it up (1→5, capped) —
@@ -72,23 +74,29 @@ Non-consumable per-level stats (combo-growth bonus, score-bonus percent, golden 
 playback-speed multiplier, etc.) are recomputed fresh from equip/level state on every change via
 `_recompute_pure_modifier_stats()`. Consumable resources (Safety Net/Echo Chamber charges, Second
 Wind uses) are granted incrementally on level-up instead (`_grant_resource_on_levelup`) so already
-spent charges never come back from a recompute. A runtime-built Loadout HUD (`_build_loadout_hud`,
-top-left corner) shows all four slots' current icon/level plus live charge counts at a glance.
+spent charges never come back from a recompute. Exhausting a charge pool does **not** unequip the
+modifier — the slot stays filled at 0, and the next miss that needs a charge is fatal (same as
+having no Defense). Restock is a later level-up (or, for Second Wind, a qualifying cash-out; see
+below). A runtime-built Loadout HUD (`_build_loadout_hud`, top-left, hidden on the menu and during
+overlays) shows all four slots, each colored by category so a draft card's border matches the slot
+it would replace.
 
 ## Mistake forgiveness
 
 A wrong pad press routes through `_resolve_defense_on_miss()`, which checks whichever single
 Defense modifier is currently equipped (only one can be, per the slot system above) and returns
 one of three outcomes: `"forgiven_hint"` (Safety Net charges, Unbreakable's per-streak free misses,
-or a lucky Muffled Strike roll), `"forced_cashout"` (Second Wind converts this specific miss into
-an early cash-out instead of ending the run), or `"game_over"` (no Defense modifier equipped, or
-its resource is exhausted). `combo` is halved (not zeroed) on any forgiven outcome, and the
+or a lucky Muffled Strike roll), `"forced_cashout"` (Second Wind: the run continues, hit points
+bank, the streak resets — not a full voluntary cash-out), or `"game_over"` (no Defense modifier
+equipped, or its resource is exhausted). `combo` is halved (not zeroed) on any forgiven outcome
+**and** on a Second Wind save, and the
 correct pad is flashed once (`_flash_miss_hint`, showing further-ahead notes too at Safety Net
 L5) before input returns to the player — a blind retry only helps when the miss was a fumble, not
 a forgotten note, so the hint is what makes the forgiveness actually usable rather than just
-theoretical. Double Down's flagged gamble step and Grand Finale's Double-or-Nothing note are
-deliberately routed *around* this function entirely — their misses are self-contained wagers, not
-normal sequence misses, and never consume a Defense resource.
+theoretical. Double Down's flagged gamble step and Grand Finale's Double-or-Nothing round (a wager
+on completing the rest of the round in progress, not a single note — see `modifier-expansion.md`)
+are deliberately routed *around* this function entirely — their misses are self-contained wagers,
+not normal sequence misses, and never consume a Defense resource.
 
 **Forgiveness protects points, not just the run.** Since cash-out (above) introduced a real
 at-risk pool (`unbanked_points`), a direct design call was made: *"protection from misses should

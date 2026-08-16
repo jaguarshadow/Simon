@@ -294,24 +294,24 @@ horizontal_alignment = 1
 
 [node name="OptionsRow" type="HBoxContainer" parent="ModifierPanel/CenterContainer/VBoxContainer"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 12
 
 [node name="Option1" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=2018001135]
-custom_minimum_size = Vector2(240, 300)
+custom_minimum_size = Vector2(248, 340)
 layout_mode = 2
 toggle_mode = false
 autowrap_mode = 2
 clip_contents = true
 
 [node name="Option2" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=340764271]
-custom_minimum_size = Vector2(240, 300)
+custom_minimum_size = Vector2(248, 340)
 layout_mode = 2
 toggle_mode = false
 autowrap_mode = 2
 clip_contents = true
 
 [node name="Option3" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=1242946524]
-custom_minimum_size = Vector2(240, 300)
+custom_minimum_size = Vector2(248, 340)
 layout_mode = 2
 toggle_mode = false
 autowrap_mode = 2
