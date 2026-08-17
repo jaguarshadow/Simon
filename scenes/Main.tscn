@@ -92,6 +92,25 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="ProgressLightsLayer" type="Control" parent="." unique_id=-1893004417]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+visible = false
+
+[node name="MusicIdiomRippleLayer" type="Control" parent="." unique_id=612390450]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="HeartsLabel" type="Label" parent="." unique_id=-167117160]
 layout_mode = 1
 offset_left = 20.0
@@ -263,6 +282,46 @@ offset_top = 40.0
 offset_right = 310.0
 offset_bottom = 76.0
 text = "Tune"
+
+[node name="MusicVizPanel" type="Control" parent="." unique_id=612390447]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ContourLegend" type="Label" parent="MusicVizPanel" unique_id=612390451]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 104.0
+offset_right = 760.0
+offset_bottom = 120.0
+theme_override_font_sizes/font_size = 12
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+text = "dot = physical L/R side  ·  ring/pad flash color = which idiom just fired (see Tune panel)"
+horizontal_alignment = 1
+
+[node name="ContourStrip" type="Control" parent="MusicVizPanel" unique_id=612390448]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 40.0
+offset_top = 122.0
+offset_right = 760.0
+offset_bottom = 168.0
+mouse_filter = 2
+clip_contents = true
+
+[node name="EventLog" type="Control" parent="MusicVizPanel" unique_id=612390449]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 150.0
+offset_top = 645.0
+offset_right = 650.0
+offset_bottom = 790.0
+mouse_filter = 2
 
 [node name="SettingsButton" type="Button" parent="." unique_id=2112373000]
 layout_mode = 1
@@ -962,6 +1021,13 @@ horizontal_alignment = 1
 [node name="AnchorRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=250288531]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How often the tune sneaks back to a \"home\" note (like a drum's steady heartbeat) between other notes, instead of wandering freely."
+
+[node name="AnchorSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow" unique_id=612390460]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(1.0, 0.85, 0.2, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow" unique_id=1905795033]
 custom_minimum_size = Vector2(140, 0)
@@ -990,6 +1056,25 @@ horizontal_alignment = 2
 [node name="ZigzagRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1712912054]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How strongly the melody prefers hopping to the opposite side of the pad ring (blue vs pink dot) instead of staying put - like a handpan player alternating hands. Notes where this actually swayed the choice get a lime ring."
+
+[node name="ZigzagSwatchA" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=612390465]
+custom_minimum_size = Vector2(5, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.55, 0.78, 1.0, 1.0)
+
+[node name="ZigzagSwatchB" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=612390466]
+custom_minimum_size = Vector2(5, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(1.0, 0.55, 0.75, 1.0)
+
+[node name="ZigzagRingSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=612390467]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.75, 1.0, 0.3, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=1888794273]
 custom_minimum_size = Vector2(140, 0)
@@ -1018,6 +1103,13 @@ horizontal_alignment = 2
 [node name="GrooveRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=225408301]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How often the drum pattern (the rhythm, not the melody) repeats itself for a couple of extra bars instead of getting reshuffled every bar - like settling into a groove."
+
+[node name="GrooveSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow" unique_id=612390461]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.5, 1.0, 0.6, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow" unique_id=534898099]
 custom_minimum_size = Vector2(140, 0)
@@ -1046,6 +1138,13 @@ horizontal_alignment = 2
 [node name="GhostRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=2059543597]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How often you hear a tiny, near-silent extra tap on the last note's pad, tucked into the quiet gaps between real notes - like a whisper, not a note you're meant to notice on its own."
+
+[node name="GhostSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow" unique_id=612390462]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.6, 0.65, 0.78, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow" unique_id=361581123]
 custom_minimum_size = Vector2(140, 0)
@@ -1074,6 +1173,13 @@ horizontal_alignment = 2
 [node name="GlissandoRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1484050175]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How often you get a quick slide across every pad in a row, like running a finger across piano keys - a rare special flourish between phrases, not part of the regular melody."
+
+[node name="GlissandoSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow" unique_id=612390463]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.4, 0.9, 0.95, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow" unique_id=1100676999]
 custom_minimum_size = Vector2(140, 0)
@@ -1102,6 +1208,13 @@ horizontal_alignment = 2
 [node name="RiffRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=423453462]
 layout_mode = 2
 theme_override_constants/separation = 10
+tooltip_text = "How often a phrase starts with a simple, beginner-taught little pattern (like 1-3-5-3) instead of wandering off on its own from the very first note."
+
+[node name="RiffSwatch" type="ColorRect" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow" unique_id=612390464]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+size_flags_vertical = 4
+color = Color(0.72, 0.45, 1.0, 1.0)
 
 [node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow" unique_id=1024833532]
 custom_minimum_size = Vector2(140, 0)

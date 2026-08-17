@@ -180,15 +180,40 @@ static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: in
 	else:
 		magnitude = randi_range(2, max_leap)
 	if magnitude == 0:
-		return {"delta": 0, "direction": last_direction, "was_leap": false}
+		return {"delta": 0, "direction": last_direction, "was_leap": false, "used_zigzag": false}
 	var direction: int
 	var is_gap_fill := false
+	# Whether zigzag_bias actually had an asymmetric crossing option to lean
+	# on for this step (vs. both/neither direction crossing, where it has
+	# nothing to prefer) - lets the Tune panel visualizer mark exactly the
+	# notes zigzag_bias shaped, instead of a color the player can't verify.
+	var used_zigzag := false
 	if last_was_leap and last_direction != 0:
 		direction = -last_direction
 		magnitude = 1
 		is_gap_fill = true
 	elif last_direction != 0 and magnitude == 1:
-		direction = last_direction if randf() < 0.70 else -last_direction
+		# Step inertia's 70/30 continue-vs-reverse split (Chiu & Temperley)
+		# is the baseline, but which option actually crosses to the other
+		# physical ring side gets pulled toward per zigzag_bias - previously
+		# zigzag only applied when there was no established direction at
+		# all (session start / a reset), which left it barely perceptible
+		# since ordinary continuing steps like this one are most of the
+		# walk. zigzag_bias's tuned range is [0.5, 1.0]; 0.5 maps to
+		# crossing_pull=0 (pure step inertia, unchanged), 1.0 to
+		# crossing_pull=1 (near-certain to take whichever option crosses).
+		var current_side := ring_side(current_degree, scale)
+		var continue_side := ring_side(reflect_degree(current_degree + last_direction), scale)
+		var reverse_side := ring_side(reflect_degree(current_degree - last_direction), scale)
+		var continue_prob := 0.70
+		var crossing_pull: float = clampf((zigzag_bias - 0.5) * 2.0, 0.0, 1.0)
+		if continue_side != current_side and reverse_side == current_side:
+			continue_prob = lerpf(0.70, 0.95, crossing_pull)
+			used_zigzag = true
+		elif reverse_side != current_side and continue_side == current_side:
+			continue_prob = lerpf(0.70, 0.30, crossing_pull)
+			used_zigzag = true
+		direction = last_direction if randf() < continue_prob else -last_direction
 	else:
 		# No established scale-degree direction to defer to (session start,
 		# or right after a phrase-end/anchor-return reset) - bias toward
@@ -199,8 +224,10 @@ static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: in
 		var minus_side := ring_side(reflect_degree(current_degree - magnitude), scale)
 		if plus_side != current_side and minus_side == current_side:
 			direction = 1 if randf() < zigzag_bias else -1
+			used_zigzag = true
 		elif minus_side != current_side and plus_side == current_side:
 			direction = -1 if randf() < zigzag_bias else 1
+			used_zigzag = true
 		else:
 			direction = 1 if randf() < 0.5 else -1
 	# Melodic arch (see docs/music-mode.md#melodic-arch) - not applied to a
@@ -208,4 +235,4 @@ static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: in
 	# shouldn't second-guess.
 	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
 		direction = arch_direction
-	return {"delta": direction * magnitude, "direction": direction, "was_leap": magnitude >= 2}
+	return {"delta": direction * magnitude, "direction": direction, "was_leap": magnitude >= 2, "used_zigzag": used_zigzag}

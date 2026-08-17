@@ -9,6 +9,15 @@ const PAD_HEIGHT := 170.0
 const BASE_RADIUS := 60.0
 const RING_CENTER := Vector2(400.0, 400.0)
 
+# Sequence-progress lights: traced along the ring's own curve, clear of both
+# the top HUD labels and the pads themselves (whose tips reach roughly
+# BASE_RADIUS + PAD_HEIGHT * 0.55 =~ 153px out). Dot size shrinks as the arc
+# fills up so long streaks still fit without overlapping.
+const PROGRESS_LIGHTS_RADIUS := 185.0
+const PROGRESS_LIGHTS_ARC_HALF_DEGREES := 55.0
+const PROGRESS_LIGHTS_MAX_DOT_RADIUS := 6.0
+const PROGRESS_LIGHTS_MIN_DOT_RADIUS := 2.0
+
 const MODIFIER_ROUND_INTERVAL := 3
 
 # Shared pause before a call/round-clear beat plays out, giving the prior
@@ -254,6 +263,7 @@ const EASTER_EGG_CODE := "hubert"
 @onready var resonator_panel: Panel = $Resonator
 @onready var duet_ring: Control = $DuetRing
 @onready var constellation_layer: Control = $ConstellationLayer
+@onready var progress_lights_layer: Control = $ProgressLightsLayer
 @onready var pad_ring: Control = $PadRing
 @onready var start_button: Button = %StartButton
 @onready var hearts_label: Label = $HeartsLabel
@@ -374,6 +384,15 @@ const MUSIC_IDIOM_RANGES := {
 @onready var music_tune_panel: Control = $MusicTunePanel
 @onready var music_tune_close_button: Button = %MusicTuneCloseButton
 @onready var duet_button: Button = %DuetButton
+# Idiom visualizer (see docs/music-mode.md#visualizing-the-idioms) - a
+# scrolling degree-over-time contour strip plus a fading event log, so a
+# player experimenting with the Tune sliders can *see* an idiom fire, not
+# just try to pick it out by ear. Music Mode only - Duet reuses the same
+# melody generator but doesn't show this panel.
+@onready var music_viz_panel: Control = $MusicVizPanel
+@onready var music_contour_strip: Control = %ContourStrip
+@onready var music_event_log: Control = %EventLog
+@onready var music_idiom_ripple_layer: Control = $MusicIdiomRippleLayer
 
 var pads_by_name: Dictionary = {}
 var pad_names: Array[String] = []
@@ -438,6 +457,50 @@ var _music_groove_bars_left := 0
 const MUSIC_LOG_INTERVAL := 32
 var _music_degree_counts: Dictionary = {}
 var _music_notes_logged := 0
+# Idiom visualizer state - see music_contour_strip/music_event_log above and
+# docs/music-mode.md#visualizing-the-idioms.
+const MUSIC_VIZ_HISTORY_MAX := 40
+const MUSIC_VIZ_EVENT_LIFETIME := 2.2
+# Tune-panel-slider idioms get a ring/ripple color matching their slider's
+# swatch, plus "resolve" (white) for the once-per-phrase tonic landing point,
+# which isn't slider-tunable but is a clear enough musical landmark not to
+# need one. "chord" (the fixed, non-tunable strong-beat nudge) stays
+# text-only in the event log rather than adding an unexplained color.
+const MUSIC_VIZ_TAG_COLORS := {
+	"anchor": Color(1.0, 0.85, 0.2),
+	"riff": Color(0.72, 0.45, 1.0),
+	"resolve": Color(1.0, 1.0, 1.0),
+	"ghost": Color(0.6, 0.65, 0.78),
+	"glissando": Color(0.4, 0.9, 0.95),
+	"zigzag": Color(0.75, 1.0, 0.3),
+}
+# Ripple pulse on the physical pad itself when an idiom fires (see
+# docs/music-mode.md#visualizing-the-idioms) - colored by MUSIC_VIZ_TAG_COLORS,
+# same colors as the Tune panel's per-slider swatches, so "which idiom just
+# fired" reads directly off the pad ring instead of requiring the player to
+# decode an abstract graph. Purely cosmetic, drawn on a layer above PadRing.
+const MUSIC_RIPPLE_DURATION_MS := 480
+const MUSIC_RIPPLE_MAX_RADIUS := 46.0
+var _music_ripples: Array[Dictionary] = []
+const MUSIC_VIZ_TAG_LABELS := {
+	"anchor": "anchor return",
+	"chord": "chord tone",
+	"riff": "riff shape",
+	"resolve": "phrase resolve",
+	"groove": "groove hold",
+	"ghost": "ghost note",
+	"glissando": "glissando",
+	"zigzag": "zigzag cross",
+}
+var _music_viz_history: Array[Dictionary] = []
+var _music_last_bar_tags: Array[String] = []
+var _music_last_bar_is_groove := false
+var _music_last_played_degree := 0
+# Set by _music_next_delta() from SequenceGenerator.walk_next_step()'s
+# "used_zigzag" flag - true only when zigzag_bias actually had an
+# asymmetric crossing option to lean on for the delta just computed, so the
+# *next* note appended can be tagged "zigzag" for the visualizer.
+var _music_last_used_zigzag := false
 var best_score := 0
 var best_round := 0
 var best_combo := 0
@@ -483,6 +546,18 @@ var _hesitation_assist_busy := false
 var _constellation_points: Array[Vector2] = []
 var _constellation_colors: Array[Color] = []
 var _constellation_alpha := 0.0
+
+# Sequence-progress lights: a row of pips tracing the ring's own curve above
+# the pads, one per note in the current sequence (Normal/Chaos's cumulative
+# `sequence`, Duet's per-round phrase - both already indexed by `player_index`
+# so one state array/draw routine covers all three modes). Rebuilt whenever
+# `sequence.size()` changes (`_rebuild_progress_lights`, called from
+# `_next_round`); each entry flips from PROGRESS_LIGHT_UNLIT to _HIT or _MISS
+# as `_register_hit`/`_resolve_defense_on_miss` reach it. Distinct from
+# Constellation (Phrasing modifier, opt-in, traces spatial position during the
+# call) - this is always-on and shows count/progress, not shape.
+enum { PROGRESS_LIGHT_UNLIT, PROGRESS_LIGHT_HIT, PROGRESS_LIGHT_MISS }
+var _progress_light_states: Array[int] = []
 
 # Pure per-level stat caches, recomputed by `_recompute_pure_modifier_stats()`
 # whenever equip/level state changes (cheap to recompute - unlike charges,
@@ -606,6 +681,9 @@ func _ready() -> void:
 	faq_close_button.pressed.connect(_on_faq_close_pressed)
 	duet_ring.draw.connect(_on_duet_ring_draw)
 	constellation_layer.draw.connect(_on_constellation_draw)
+	progress_lights_layer.draw.connect(_on_progress_lights_draw)
+	music_contour_strip.draw.connect(_on_music_contour_draw)
+	music_idiom_ripple_layer.draw.connect(_on_music_ripple_draw)
 	_build_faq_content()
 	_connect_ui_clicks()
 	_setup_mix_sliders()
@@ -1742,6 +1820,7 @@ func _on_zen_button_pressed() -> void:
 		score_label.visible = false
 		cash_out_button.visible = false
 		zen_bar.visible = true
+		progress_lights_layer.visible = false
 		settings_button.disabled = false
 		_set_pads_disabled(false)
 	)
@@ -1783,6 +1862,8 @@ func _on_music_button_pressed() -> void:
 		score_label.visible = false
 		cash_out_button.visible = false
 		music_bar.visible = true
+		music_viz_panel.visible = true
+		progress_lights_layer.visible = false
 		settings_button.disabled = false
 		_set_pads_disabled(true)
 		_reset_music_idiom_sliders()
@@ -1802,6 +1883,7 @@ func _on_exit_music_pressed() -> void:
 		combo_label.visible = true
 		score_label.visible = true
 		music_bar.visible = false
+		music_viz_panel.visible = false
 		music_tune_panel.visible = false
 		round_label.text = "Round: 0"
 		score_label.text = "Score: 0"
@@ -1864,6 +1946,14 @@ func _music_reset_walk() -> void:
 	_music_groove_bars_left = 0
 	_music_degree_counts = {}
 	_music_notes_logged = 0
+	_music_viz_history.clear()
+	if music_contour_strip:
+		music_contour_strip.queue_redraw()
+	if music_event_log:
+		for child in music_event_log.get_children():
+			child.queue_free()
+	_music_viz_log_entries.clear()
+	_music_ripples.clear()
 
 # Delegates to SequenceGenerator.walk_next_step() - see that file for the
 # algorithm and rationale. Fetches the current scale here since the static
@@ -1876,6 +1966,7 @@ func _music_next_delta(max_leap: int) -> int:
 	var step := _walk_next_step(max_leap, _music_repeat_streak, _music_last_direction, _music_last_was_leap, _music_current_degree, _music_idiom_value("zigzag_bias"), _music_arch_direction())
 	_music_last_direction = step["direction"]
 	_music_last_was_leap = step["was_leap"]
+	_music_last_used_zigzag = step["used_zigzag"]
 	return step["delta"]
 
 # Which way the phrase-level melodic arch wants the walk to move right now -
@@ -1895,6 +1986,11 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
 	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
 	var degrees: Array[int] = []
+	# Parallel to `degrees` - which idiom (if any) put this specific note
+	# where it is, for the Tune panel's live event log/contour strip. Pure
+	# bookkeeping, never affects note choice. See
+	# docs/music-mode.md#visualizing-the-idioms.
+	var tags: Array[String] = []
 	# Canonical riff shape: only offered at the start of a phrase (mirrors
 	# how these are taught - fixed little patterns, not spliced into the
 	# middle of an improvised line). Expressed as offsets from wherever the
@@ -1904,15 +2000,23 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	if _music_bar_index % MUSIC_PHRASE_BARS == 0 and randf() < _music_idiom_value("riff_shapes"):
 		riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
 	var riff_base := _music_current_degree
+	# Whether the *previous* note's direction pick actually leaned on
+	# zigzag_bias (SequenceGenerator.walk_next_step()'s "used_zigzag") - if
+	# so, tag the note that resulted from it, so the contour strip can mark
+	# exactly which notes the slider shaped instead of leaving it invisible.
+	var pending_zigzag := false
 	for i in pulse_count:
 		if i < riff.size():
 			var riff_degree := _reflect_degree(riff_base + int(riff[i]))
 			degrees.append(riff_degree)
+			tags.append("riff")
 			_music_current_degree = riff_degree
 			_music_last_direction = 0
 			_music_repeat_streak = 1
+			pending_zigzag = false
 			continue
 		var degree := _music_current_degree
+		var tag := ""
 		# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-
 		# strong-beats): pulse 0 is always the bar's downbeat (the Euclidean
 		# generator always places an onset at step 0 - see
@@ -1925,6 +2029,7 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 		if i == 0 and not _is_resolution_degree(degree, scale) and randf() < MUSIC_STRONG_BEAT_CHORD_TONE_CHANCE:
 			degree = _nearest_chord_tone_degree(degree, scale)
 			_music_current_degree = degree
+			tag = "chord"
 		if not _is_resolution_degree(degree, scale) and randf() < _music_idiom_value("anchor_return"):
 			# Ghost return to a tonal-hierarchy-weighted tonic/third/fifth,
 			# same reset the phrase-end resolution below does - so the walk
@@ -1935,8 +2040,14 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 			_music_current_degree = degree
 			_music_last_direction = 0
 			_music_repeat_streak = 1
+			tag = "anchor"
+		if tag == "" and pending_zigzag:
+			tag = "zigzag"
+		pending_zigzag = false
 		degrees.append(degree)
+		tags.append(tag)
 		var delta := _music_next_delta(max_leap)
+		pending_zigzag = _music_last_used_zigzag
 		var raw_target := degree + delta
 		var new_degree := _reflect_degree(raw_target)
 		if new_degree != raw_target and delta != 0:
@@ -1953,8 +2064,10 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 	if _music_bar_index % MUSIC_PHRASE_BARS == 0:
 		var resolution_degree := _pick_resolution_degree(scale)
 		degrees[degrees.size() - 1] = resolution_degree
+		tags[tags.size() - 1] = "resolve"
 		_music_current_degree = resolution_degree
 		_music_last_direction = 0
+	_music_last_bar_tags = tags
 	return degrees
 
 # Looks up the pad currently tuned to a scale degree, per the ring_order
@@ -1994,6 +2107,7 @@ func _music_glissando_sweep(step_duration: float) -> void:
 		var pad := _music_pad_for_degree(degree)
 		if pad:
 			await pad.flash(flash_dur, MUSIC_GLISSANDO_DECAY, MUSIC_GLISSANDO_VOLUME)
+		_music_viz_push(degree, "glissando", false)
 		var remaining := spacing - flash_dur
 		if remaining > 0.0:
 			await get_tree().create_timer(remaining).timeout
@@ -2028,6 +2142,143 @@ func _print_music_degree_distribution() -> void:
 		parts.append("%s=%d(%.0f%%)" % [note_name, count, pct])
 	print("[MusicMode] n=%d, uniform=%.0f%%: %s" % [total, expected_pct, ", ".join(parts)])
 
+# --- Idiom visualizer (docs/music-mode.md#visualizing-the-idioms) ---
+# Every note that actually plays gets pushed here with whichever idiom tag
+# (if any) shaped it, so the Tune panel's contour strip/event log can show a
+# player *which* idiom just fired instead of leaving them to guess by ear.
+# Pure observation - never feeds back into note selection.
+var _music_viz_log_entries: Array[Dictionary] = []
+
+func _music_viz_push(degree: int, tag: String, groove: bool) -> void:
+	if not music_mode:
+		return
+	_music_viz_history.append({"degree": degree, "side": _music_ring_side(degree), "tag": tag, "groove": groove})
+	if _music_viz_history.size() > MUSIC_VIZ_HISTORY_MAX:
+		_music_viz_history.pop_front()
+	music_contour_strip.queue_redraw()
+	if tag != "":
+		_music_viz_log_event(MUSIC_VIZ_TAG_LABELS.get(tag, tag))
+		if MUSIC_VIZ_TAG_COLORS.has(tag):
+			_music_spawn_ripple(degree, MUSIC_VIZ_TAG_COLORS[tag])
+	elif groove:
+		_music_viz_log_event(MUSIC_VIZ_TAG_LABELS["groove"])
+
+# Anchor point for a degree's pad - same "just past the pad tip" point
+# _position_label() uses for the note label, recovered from the pad's
+# current rotation rather than a stored dir, since pads get reshuffled
+# around the ring between runs.
+func _music_pad_anchor(degree: int) -> Vector2:
+	var pad := _music_pad_for_degree(degree)
+	if pad == null:
+		return RING_CENTER
+	var angle_rad := deg_to_rad(pad.rotation_degrees + 90.0)
+	var dir := Vector2(cos(angle_rad), sin(angle_rad))
+	return RING_CENTER + dir * (BASE_RADIUS + PAD_HEIGHT * 0.55)
+
+func _music_spawn_ripple(degree: int, color: Color) -> void:
+	_music_ripples.append({"pos": _music_pad_anchor(degree), "color": color, "start_ms": Time.get_ticks_msec()})
+	music_idiom_ripple_layer.queue_redraw()
+
+func _on_music_ripple_draw() -> void:
+	var now := Time.get_ticks_msec()
+	for r in _music_ripples:
+		var t: float = clampf(float(now - int(r["start_ms"])) / float(MUSIC_RIPPLE_DURATION_MS), 0.0, 1.0)
+		var radius := lerpf(8.0, MUSIC_RIPPLE_MAX_RADIUS, t)
+		var color: Color = r["color"]
+		color.a = (1.0 - t) * 0.85
+		music_idiom_ripple_layer.draw_arc(r["pos"], radius, 0.0, TAU, 28, color, 3.0, true)
+		var glow: Color = r["color"]
+		glow.a = (1.0 - t) * 0.18
+		music_idiom_ripple_layer.draw_circle(r["pos"], radius * 0.6, glow)
+
+# Newest event at the top, older ones pushed down and faded, each expiring
+# after MUSIC_VIZ_EVENT_LIFETIME - a player holding a slider at 100% should
+# see this list fill up almost solid; at the tuned default, only occasional.
+# Expiry is driven by _process (_music_viz_prune_log), not a per-label Tween
+# callback - a Tween whose captured Label gets queue_free()'d elsewhere first
+# (e.g. _music_reset_walk() clearing the log on a new session) fires against
+# a freed object and logs an engine-level "Lambda capture was freed" error.
+func _music_viz_log_event(text: String) -> void:
+	var lbl := Label.new()
+	lbl.text = "* " + text
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.92))
+	music_event_log.add_child(lbl)
+	_music_viz_log_entries.push_front({"label": lbl, "start_ms": Time.get_ticks_msec()})
+	while _music_viz_log_entries.size() > 6:
+		_music_viz_log_entries.pop_back()["label"].queue_free()
+	_music_viz_relayout_log()
+
+func _music_viz_prune_log() -> void:
+	var now := Time.get_ticks_msec()
+	var expire_ms := int(MUSIC_VIZ_EVENT_LIFETIME * 1000.0)
+	var changed := false
+	for i in range(_music_viz_log_entries.size() - 1, -1, -1):
+		var entry: Dictionary = _music_viz_log_entries[i]
+		if now - int(entry["start_ms"]) >= expire_ms:
+			entry["label"].queue_free()
+			_music_viz_log_entries.remove_at(i)
+			changed = true
+	if changed:
+		_music_viz_relayout_log()
+
+func _music_viz_relayout_log() -> void:
+	for i in _music_viz_log_entries.size():
+		var lbl: Label = _music_viz_log_entries[i]["label"]
+		lbl.position = Vector2(0, i * 24.0)
+		lbl.modulate.a = 1.0 - float(i) * 0.14
+
+# Contour strip: one dot per recent note, x = time (oldest at left), y =
+# scale degree (higher pitch = higher up), colored by which ring side the
+# note's pad sits on (see _music_ring_side) - alternating colors should be
+# obvious when zigzag_bias is cranked up, and a gold/purple/white outline
+# marks anchor-return/riff/phrase-resolve notes so they stand out from the
+# ordinary walk. The connecting line makes the melodic arch's rise-then-fall
+# shape visible directly instead of needing to be inferred by ear.
+func _on_music_contour_draw() -> void:
+	var rect: Vector2 = music_contour_strip.size
+	var n := _music_viz_history.size()
+	if n == 0 or rect.x <= 0.0:
+		return
+	var step_x := rect.x / float(max(MUSIC_VIZ_HISTORY_MAX - 1, 1))
+	var top_pad := 8.0
+	var usable_h: float = rect.y - top_pad * 2.0
+	var points: Array[Vector2] = []
+	# Ghost notes and glissando sweeps never touch the walk's state (see
+	# docs/music-mode.md) - they're not degree i+1 following from degree i,
+	# so connecting them into the melodic line would draw a contour that
+	# never actually happened. Only real walk notes link up.
+	var line_points: Array[Vector2] = []
+	for i in n:
+		var entry: Dictionary = _music_viz_history[i]
+		var degree: int = entry["degree"]
+		var x := float(MUSIC_VIZ_HISTORY_MAX - n + i) * step_x
+		var y := top_pad + usable_h * (1.0 - float(degree) / float(PAD_COUNT - 1))
+		points.append(Vector2(x, y))
+		var entry_tag: String = entry.get("tag", "")
+		if entry_tag != "ghost" and entry_tag != "glissando":
+			line_points.append(Vector2(x, y))
+	for i in line_points.size() - 1:
+		music_contour_strip.draw_line(line_points[i], line_points[i + 1], Color(1.0, 1.0, 1.0, 0.22), 1.5)
+	for i in n:
+		var entry: Dictionary = _music_viz_history[i]
+		var p: Vector2 = points[i]
+		var tag: String = entry.get("tag", "")
+		if tag == "ghost":
+			# Deliberately not a filled dot like a real note - a small
+			# hollow, muted ring off the melodic line reads as "quiet
+			# background filler," matching what a ghost note actually is.
+			music_contour_strip.draw_arc(p, 3.0, 0.0, TAU, 12, MUSIC_VIZ_TAG_COLORS["ghost"], 1.8, true)
+			continue
+		var side: int = entry["side"]
+		var dot_color: Color = Color(0.55, 0.78, 1.0) if side == 0 else Color(1.0, 0.55, 0.75)
+		var radius := 5.0 if i == n - 1 else 3.5
+		music_contour_strip.draw_circle(p, radius, dot_color)
+		if entry.get("groove", false):
+			music_contour_strip.draw_line(p + Vector2(-4.0, 8.0), p + Vector2(4.0, 8.0), Color(0.5, 1.0, 0.6, 0.9), 2.0)
+		if MUSIC_VIZ_TAG_COLORS.has(tag):
+			music_contour_strip.draw_arc(p, radius + 2.5, 0.0, TAU, 16, MUSIC_VIZ_TAG_COLORS[tag], 1.6, true)
+
 # Drives Music Mode: generates one Euclidean-rhythm bar + melody phrase at a
 # time and plays it, looping until the player exits. Tempo is fixed for the
 # whole session; scale/theme changes take effect on the next note lookup
@@ -2044,9 +2295,11 @@ func _music_loop() -> void:
 			if not music_mode:
 				return
 		var rhythm: Array[bool]
+		var is_groove_bar := false
 		if _music_groove_bars_left > 0:
 			rhythm = _music_groove_rhythm
 			_music_groove_bars_left -= 1
+			is_groove_bar = true
 		else:
 			rhythm = _generate_music_rhythm()
 			if randf() < _music_idiom_value("groove_repeats"):
@@ -2064,8 +2317,11 @@ func _music_loop() -> void:
 			if rhythm[step_index]:
 				var degree := melody[note_i]
 				var pad := _music_pad_for_degree(degree)
+				var note_tag: String = _music_last_bar_tags[note_i] if note_i < _music_last_bar_tags.size() else ""
 				note_i += 1
 				_music_log_degree(degree)
+				_music_viz_push(degree, note_tag, is_groove_bar)
+				_music_last_played_degree = degree
 				var is_downbeat := step_index == 0
 				var decay := MUSIC_ACCENT_DECAY if is_downbeat else MUSIC_DECAY_RATE
 				var volume := MUSIC_ACCENT_VOLUME if is_downbeat else MUSIC_VOLUME
@@ -2078,6 +2334,7 @@ func _music_loop() -> void:
 			elif last_played_pad and randf() < _music_idiom_value("ghost_notes"):
 				# Ghost note: quiet filler tap on the last real note's pad,
 				# doesn't touch the melody walk at all.
+				_music_viz_push(_music_last_played_degree, "ghost", false)
 				var ghost_flash: float = min(step_duration * MUSIC_GHOST_FLASH_FRACTION, flash_duration)
 				await last_played_pad.flash(ghost_flash, MUSIC_GHOST_DECAY, MUSIC_GHOST_VOLUME)
 				var remaining := step_duration - ghost_flash
@@ -2440,6 +2697,7 @@ func _next_round() -> void:
 	var queued := duet_wave_round if duet_mode else sequence.size()
 	var wave_suffix := "  (Streak %d)" % queued
 	round_label.text = (round_prefix + "Round: %d") % _current_round() + wave_suffix
+	_rebuild_progress_lights(sequence.size())
 	_roll_gold_indices()
 	_roll_lucky_strike_index()
 	await _play_sequence()
@@ -2862,6 +3120,12 @@ func _process(_delta: float) -> void:
 		duet_ring.queue_redraw()
 	if equipped_modifiers["tempo"] == "constellation":
 		constellation_layer.queue_redraw()
+	if not _music_ripples.is_empty():
+		var now := Time.get_ticks_msec()
+		_music_ripples = _music_ripples.filter(func(r): return now - int(r["start_ms"]) < MUSIC_RIPPLE_DURATION_MS)
+		music_idiom_ripple_layer.queue_redraw()
+	if music_mode and not _music_viz_log_entries.is_empty():
+		_music_viz_prune_log()
 	_check_hesitation_assists()
 
 # Constellation (Phrasing): draws a fading trail between consecutively-
@@ -2884,6 +3148,42 @@ func _on_constellation_draw() -> void:
 		var color := _constellation_colors[i + 1]
 		color.a = lerpf(0.1, 0.8, recency) * _constellation_alpha
 		constellation_layer.draw_line(_constellation_points[i], _constellation_points[i + 1], color, 2.5, true)
+
+# Sequence-progress lights (see the `_progress_light_states` declaration for
+# why this is separate from Constellation). Rebuilt once per round, right
+# after `sequence`/the Duet phrase is sized for the round about to play, so
+# the lights are already correct when the call phase starts.
+func _rebuild_progress_lights(count: int) -> void:
+	_progress_light_states.resize(count)
+	_progress_light_states.fill(PROGRESS_LIGHT_UNLIT)
+	progress_lights_layer.visible = count > 0
+	progress_lights_layer.queue_redraw()
+
+func _mark_progress_light(index: int, state: int) -> void:
+	if index < 0 or index >= _progress_light_states.size():
+		return
+	_progress_light_states[index] = state
+	progress_lights_layer.queue_redraw()
+
+func _on_progress_lights_draw() -> void:
+	var count := _progress_light_states.size()
+	if count == 0:
+		return
+	var dot_radius: float = clampf(140.0 / float(count), PROGRESS_LIGHTS_MIN_DOT_RADIUS, PROGRESS_LIGHTS_MAX_DOT_RADIUS)
+	var half_deg := PROGRESS_LIGHTS_ARC_HALF_DEGREES
+	for i in count:
+		var t: float = 0.5 if count == 1 else float(i) / float(count - 1)
+		var deg := lerpf(-90.0 - half_deg, -90.0 + half_deg, t)
+		var pos := RING_CENTER + Vector2.RIGHT.rotated(deg_to_rad(deg)) * PROGRESS_LIGHTS_RADIUS
+		var color: Color
+		match _progress_light_states[i]:
+			PROGRESS_LIGHT_HIT:
+				color = Color(1.0, 0.85, 0.3, 0.9)
+			PROGRESS_LIGHT_MISS:
+				color = Color(1.0, 0.55, 0.55, 0.7)
+			_:
+				color = Color(1.0, 1.0, 1.0, 0.18)
+		progress_lights_layer.draw_circle(pos, dot_radius, color)
 
 # Echo Chamber and Quick Rewind (docs/modifier-audit.md rule 6) both trigger
 # off the same signal - how long it's been since the player's last correct
@@ -3050,6 +3350,7 @@ func _try_second_wind_refill() -> void:
 	_show_toast("Second Wind! Heart refilled (%d/%d)." % [hearts, max_hearts])
 
 func _register_hit(pad_name: String, click_pos: Vector2, timing_multiplier := 1.0) -> void:
+	_mark_progress_light(player_index, PROGRESS_LIGHT_HIT)
 	combo += 1
 	_wave_hit_count += 1
 	current_round_has_hit = true
@@ -3290,6 +3591,7 @@ func _completed_repeated_chunk(idx: int) -> bool:
 # miss independently of the heart pool. Only once hearts hit zero (with no
 # modifier save available) does a miss actually end the run.
 func _resolve_defense_on_miss() -> String:
+	_mark_progress_light(player_index, PROGRESS_LIGHT_MISS)
 	current_streak_had_miss = true
 	var def_id: String = equipped_modifiers["defense"]
 	match def_id:
@@ -3537,17 +3839,21 @@ func _show_swap_or_skip_dialog(new_id: String, incumbent_id: String) -> void:
 	var skip_btn := Button.new()
 	skip_btn.text = "Keep %s" % old_mod["title"]
 	row.add_child(skip_btn)
-	var done := false
-	var do_swap := false
+	# GDScript lambdas capture local bool/int variables by value, not by
+	# reference - two lambdas each writing their own copy of a plain `done`
+	# local would never be visible to this while loop, so it'd spin forever
+	# with the dialog stuck on screen. A Dictionary is a reference type, so
+	# both closures and this loop share the same underlying storage.
+	var state := {"done": false, "do_swap": false}
 	swap_btn.pressed.connect(func():
-		do_swap = true
-		done = true)
+		state.do_swap = true
+		state.done = true)
 	skip_btn.pressed.connect(func():
-		done = true)
-	while not done:
+		state.done = true)
+	while not state.done:
 		await get_tree().process_frame
 	dim.queue_free()
-	if do_swap:
+	if state.do_swap:
 		# The incumbent's level/resources are left untouched (dormant, not
 		# lost) - re-drafting it later in the same run resumes where it
 		# left off rather than starting over.

@@ -148,13 +148,32 @@ below) to find patterns that are idiomatic to *this instrument* rather than gene
   next note to a resolution degree (tonic or in-range octave - see
   [Note distribution bias fix](#note-distribution-bias-fix) below) and resetting momentum, so the
   walk resumes cleanly from the anchor rather than carrying direction from before the jump.
-- **Zigzag / alternating-side contour** (`MUSIC_IDIOM_RANGES["zigzag_bias"]`, default 0.75) - handpan note
-  layouts are numbered in a zigzag specifically so players alternate hands across the ring rather
-  than run scalar sequences; it's a *physical* constraint that becomes a melodic signature. Pads
-  are laid out on a ring via `ring_order`, so `_music_next_delta()` biases direction choice
-  toward whichever candidate note lands on the opposite ring side from the current note -
-  instead of the raw scale-degree-adjacency bias it used before - whenever there's no established
-  direction to defer to (session start, or right after a phrase-end/anchor-return reset).
+- **Zigzag / alternating-side contour** (`MUSIC_IDIOM_RANGES["zigzag_bias"]`, range 0.5-1.0, default
+  0.75) - handpan note layouts are numbered in a zigzag specifically so players alternate hands
+  across the ring rather than run scalar sequences; it's a *physical* constraint that becomes a
+  melodic signature. Pads are laid out on a ring via `ring_order`, so `SequenceGenerator.walk_next_step()`
+  biases direction choice toward whichever candidate note lands on the opposite ring side from the
+  current note, instead of the raw scale-degree-adjacency bias it used before.
+
+  The first version only applied this when there was no established direction to defer to (session
+  start, or right after a phrase-end/anchor-return reset) - a real player report ("cranking the
+  slider doesn't audibly/visibly change anything") turned out to be correct, not just a
+  visualization gap: that condition is rare on its own, *and* even then only a minority of scale
+  degrees have an asymmetric crossing option to lean on (for `d_minor_pentatonic`'s ring layout,
+  exactly 1 of 8), so the slider's effect was buried in noise. Verified directly - simulating 2000
+  steps of `walk_next_step()` at `zigzag_bias=0.5` (the tuned-range floor) vs. `1.0` and measuring
+  how often consecutive notes land on opposite ring sides gave 30% vs. 43%, i.e. the floor produced
+  essentially the same alternation rate a fresh coin-flip walk would.
+
+  Broadened to also weigh in on step inertia's ordinary continue-vs-reverse pick (the 70/30 split,
+  most of the walk's steps) rather than only the rare no-established-direction case: whichever of
+  "continue" or "reverse" actually crosses to the other ring side gets pulled toward, scaled by
+  `zigzag_bias` (0.5 = pure step inertia, unchanged from before; 1.0 = near-certain to take
+  whichever option crosses). `walk_next_step()` returns a `used_zigzag` flag marking exactly which
+  notes this decided, consumed by the Tune panel visualizer (see
+  [Visualizing the idioms](#visualizing-the-idioms) below) rather than left for the player to
+  infer. Re-verified after the change: 30% (unchanged floor) vs. 43% (up from a pre-fix ~31-33%) -
+  now driven by most of the walk's steps instead of a handful of resets per phrase.
 - **Glissando sweep** (`_music_glissando_sweep()`, chance range default 10%) - sliding a mallet
   across several tongues in quick succession is a named technique, not an accident of a rhythm
   generator. A rare run across the full scale (single direction, quiet) is inserted as a special
@@ -218,6 +237,47 @@ Sources: [Beat Root - tongue drum improvisation](https://www.beatrootdrum.com/tu
 [Cosmos Handpan - notes chart guide](https://www.cosmoshandpan.com/blogs/news/handpan-drum-notes-chart-complete-guide-for-players-buyers),
 [Malte Marten Method - zig-zag fundamentals](https://www.maltemartenmethod.com/handpan-fundamentals),
 [The Sound Artist - handpan rhythm patterns](https://thesoundartist.com/blogs/news/handpan-tutorial-learning-rhythms-and-music-patterns).
+
+## Visualizing the idioms
+
+Player-reported: turning the Tune panel sliders up/down didn't produce an audible/visible
+difference they could actually pin on a specific idiom - "it works but I can't tell what changed."
+Three pieces, all in `Main.gd`/`Main.tscn`, none of which touch note selection (except the
+zigzag_bias fix above, which was a real generator bug the visualizer surfaced rather than a
+rendering issue):
+
+- **Contour strip** (`ContourStrip`, drawn in `_on_music_contour_draw()`) - a scrolling plot of the
+  last `MUSIC_VIZ_HISTORY_MAX` notes, x = time, y = scale degree, dot color = which physical ring
+  side the note's pad sits on (`_music_ring_side()`). Only real walk notes are connected by the
+  contour line - ghost notes and glissando sweeps are pushed to the same history for their
+  timeline position, but excluded from the line, since they never touch `_music_current_degree`
+  (see [Idioms](#idioms-borrowed-from-how-the-real-instrument-is-played) above) and connecting them
+  would draw a melodic contour that never happened. Ghost notes render as a small hollow ring
+  instead of a filled dot for the same reason - visually distinct from a real note, not just a
+  fainter one.
+- **Ripple pulse** (`MusicIdiomRippleLayer`, `_on_music_ripple_draw()`) - when a note is tagged
+  with an idiom that has a Tune-panel slider (anchor return, riff, ghost, glissando) or is a
+  phrase's tonic landing point (resolve), the pad that note actually plays on flashes an expanding,
+  fading colored ring, tagged in `MUSIC_VIZ_TAG_COLORS`. This is the primary way to judge an
+  idiom's slider - crank Anchor Return to max and pads should flash gold almost constantly; at 0%,
+  never. A line graph of an abstract history array asks the player to spot a *pattern*; a colored
+  pulse on the actual pad they're already watching just asks them to notice a *color*, tying the
+  slider directly to the physical instrument metaphor the rest of the mode already uses.
+- **Event log** (`EventLog`, `_music_viz_log_event()`) - a fading text list of the same events
+  ("anchor return", "riff shape", ...), newest on top. Expiry is driven by a timestamp check in
+  `_process()` (`_music_viz_prune_log()`), not a per-label `Tween` callback - a `Tween` whose
+  captured `Label` gets `queue_free()`'d elsewhere first (e.g. `_music_reset_walk()` clearing the
+  log wholesale at the start of a new session) fires later against an already-freed object and logs
+  an engine-level "Lambda capture was freed" error. Same reasoning applied to ripple expiry
+  (`_music_ripples`, pruned in `_process()`) even though ripples don't hold Object references and
+  so weren't actually at risk - kept consistent with the log's approach rather than mixing two
+  expiry strategies for what's conceptually the same kind of timed visual.
+
+Every color the player can see (ripple, ring outline, log entry) has a matching swatch next to its
+slider in `MusicTunePanel` - `chord` (the fixed, non-tunable strong-beat nudge) deliberately stays
+text-only in the log rather than showing a color with no slider to explain it. Each slider row also
+carries an ELI5 `tooltip_text` in `Main.tscn` explaining what the idiom does in plain language, since
+the docs above assume familiarity with the generator that a player tuning sliders won't have.
 
 ## Note distribution bias fix
 
