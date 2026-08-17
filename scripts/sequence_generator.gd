@@ -98,35 +98,38 @@ static func semitones_from_tonic(degree: int, scale: Dictionary) -> int:
 # docs/music-mode.md#note-distribution-bias-fix.
 #
 # `style` (optional, defaults to {} so every non-Music-Mode call site is
-# unaffected) picks which degrees count as the secondary tier and how
-# strongly they're weighted relative to the tonic - see
-# GameData.MUSIC_STYLES. Two modes, both computed generically from the
-# scale's own tuned frequencies (no scale-type guard, works on any scale):
-#   "triad" (default) - minor/major third or perfect fifth (3, 4, or 7
-#   semitones from the tonic), the Western tonal-hierarchy tier.
-#   "fourth_octave" - the perfect 4th (5 semitones) instead, per Koizumi's
-#   Japanese nuclear-tone theory (docs cite this under the Japanese/Eastern
-#   style). The octave itself already falls under the tonic tier (0
-#   semitones after the mod-12 fold), so it needs no separate case here.
-# `style.resolution_secondary_weight` overrides the tier's weight (defaults
-# to MUSIC_DEGREE_WEIGHT_TRIAD) - e.g. Reggae raises it toward the tonic
-# weight for a stronger, bassline-like pull; Middle Eastern lowers it for a
-# looser, less-resolved feel. Same one mechanism produces both effects.
+# unaffected) is a small resolved-context dict, not a raw GameData.MUSIC_STYLES
+# entry - see Main.gd's _resolution_style_context(). Two knobs, both computed
+# generically from the scale's own tuned frequencies (no scale-type guard,
+# works on any scale):
+#   resolution_secondary_weight - the secondary tier's weight relative to the
+#   tonic (defaults to MUSIC_DEGREE_WEIGHT_TRIAD). Raising it toward the tonic
+#   weight gives a stronger, bassline-like pull (Reggae); lowering it gives a
+#   looser, less-resolved feel (Middle Eastern). A per-style constant, not
+#   Tune-panel-tunable.
+#   fourth_octave_blend (0..1, live-tunable via the "fourth_octave" idiom
+#   slider) - blends how much of the secondary weight goes to the Western
+#   triad tier (minor/major 3rd or perfect 5th - 3, 4, or 7 semitones from
+#   the tonic) versus the perfect 4th (5 semitones), per Koizumi's Japanese
+#   nuclear-tone theory. 0 = pure triad (today's original behavior), 1 = pure
+#   4th. The octave itself already falls under the tonic tier (0 semitones
+#   after the mod-12 fold), so it needs no separate case here.
 static func scale_degree_weight(degree: int, scale: Dictionary, style: Dictionary = {}) -> float:
-	var resolution_mode: String = style.get("resolution_mode", "triad")
 	var secondary_weight: float = style.get("resolution_secondary_weight", MUSIC_DEGREE_WEIGHT_TRIAD)
+	var fourth_blend: float = style.get("fourth_octave_blend", 0.0)
 	var semitones := semitones_from_tonic(degree, scale)
 	var weight := 0.0
 	if semitones == 0:
 		weight = MUSIC_DEGREE_WEIGHT_TONIC
-	elif resolution_mode == "fourth_octave":
-		if semitones != 5:
-			return 0.0
-		weight = secondary_weight
 	else:
-		if semitones != 3 and semitones != 4 and semitones != 7:
+		var is_triad_tier := semitones == 3 or semitones == 4 or semitones == 7
+		var is_fourth_tier := semitones == 5
+		if is_triad_tier:
+			weight += secondary_weight * (1.0 - fourth_blend)
+		if is_fourth_tier:
+			weight += secondary_weight * fourth_blend
+		if weight <= 0.0:
 			return 0.0
-		weight = secondary_weight
 	if degree == 0 or degree == PAD_COUNT - 1:
 		weight *= MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR
 	return weight

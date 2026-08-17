@@ -106,78 +106,71 @@ const SCALES := [
 	{"id": "whole_tone", "name": "C Whole\nTone", "tones": [261.63, 293.66, 329.63, 369.99, 415.3, 466.16, 523.25, 587.33], "notes": ["C", "D", "E", "F#", "G#", "A#", "C", "D"], "unlock": {"type": "combo", "value": 30}, "ring_order": HANDPAN_RING_ORDER},
 ]
 
-# Music Mode "Style" presets - reparametrize the generator (Main.gd's
-# _music_*/_normal_* functions, SequenceGenerator's resolution weighting)
-# per real-world melodic idiom, without new instruments or per-style
-# exception code. Every entry shares the exact same field shape; different
-# styles pick different *values*, never a field/guard the others lack -
-# see docs/music-mode.md#style-presets for the full research writeup and
+# Music Mode "Style" presets - each one IS a Tune-panel preset: picking a
+# style loads its `idiom_preset` values straight into the same sliders the
+# player can drag by hand (Main.gd's _apply_style_idiom_preset()), so the
+# Style panel and Tune panel are one connected system, not two independent
+# ones. Every entry shares the exact same field shape; different styles pick
+# different *values*, never a field/guard the others lack - see
+# docs/music-mode.md#style-presets for the full research writeup and
 # per-style reasoning.
 #
-#   accent_mode                 "downbeat" | "offbeat" - which rhythm pulse
-#                                gets the accent (see Main.gd's
-#                                _music_is_accented_step()).
-#   resolution_mode              "triad" | "fourth_octave" - which degrees
-#                                count as the secondary tonal-hierarchy tier
-#                                (see SequenceGenerator.scale_degree_weight()).
-#   resolution_secondary_weight  overrides that tier's weight relative to
-#                                the tonic (MUSIC_DEGREE_WEIGHT_TRIAD=1.5 is
-#                                the unmodified baseline; higher = stronger/
-#                                more bassline-like pull, lower = looser).
-#   chord_tone_nudge_chance      per-note (not just strong-beat) chance to
-#                                nudge onto the nearest chord tone.
+#   idiom_preset                 sparse {idiom_key: slider_value} (0..1) -
+#                                any MUSIC_IDIOM_KEYS entry left unset
+#                                defaults to 0.5, the same as a slider a
+#                                player never touched. Loaded into
+#                                music_idiom_levels verbatim on pick, so
+#                                every slider visibly jumps to the preset
+#                                and the player can keep tuning from there.
+#   resolution_secondary_weight  the tonal-hierarchy secondary tier's weight
+#                                relative to the tonic (MUSIC_DEGREE_WEIGHT_
+#                                TRIAD=1.5 is the unmodified baseline; higher
+#                                = stronger/more bassline-like pull, lower =
+#                                looser). Not Tune-panel-tunable - a
+#                                background per-style constant, same
+#                                category as rhythm density below.
 #   rhythm_pulses_min/max        Euclidean onset count out of 16 steps.
-#   idiom_overrides              sparse {idiom_key: {min,default,max}}
-#                                merged over MUSIC_IDIOM_RANGES.
 #   max_leap_override            overrides the narrow/pentatonic max-leap
 #                                pick when non-null.
-#   phrase_structure              "arch" | "flat_arch" | "call_response".
-#   groove_lock                  true forces groove_repeats/riff_shapes
-#                                near-permanently on instead of the normal
-#                                per-bar roll (Junkanoo's locked ostinato).
+#   flat_arch                    true uses a smaller melodic-arch bias
+#                                magnitude (gentler rise/fall) instead of
+#                                the standard one.
 const MUSIC_STYLES := [
 	{"id": "western", "name": "Western",
-		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
-		"chord_tone_nudge_chance": 0.0,
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.0, "call_response": 0.0, "fourth_octave": 0.0},
+		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 5, "rhythm_pulses_max": 9,
-		"idiom_overrides": {}, "max_leap_override": null,
-		"phrase_structure": "arch", "groove_lock": false},
+		"max_leap_override": null, "flat_arch": false},
 	{"id": "reggae", "name": "Reggae\n(Jamaica)",
-		"accent_mode": "offbeat", "resolution_mode": "triad", "resolution_secondary_weight": 2.1,
-		"chord_tone_nudge_chance": 0.75,
+		"idiom_preset": {"offbeat_accent": 0.85, "chord_tone_bias": 0.75, "call_response": 0.0, "fourth_octave": 0.0, "groove_repeats": 0.8},
+		"resolution_secondary_weight": 2.1,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 6,
-		"idiom_overrides": {"groove_repeats": {"min": 0.35, "default": 0.75, "max": 0.95}},
-		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+		"max_leap_override": null, "flat_arch": false},
 	{"id": "junkanoo", "name": "Junkanoo\n(Bahamas)",
-		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.6,
-		"chord_tone_nudge_chance": 0.4,
+		"idiom_preset": {"offbeat_accent": 0.1, "chord_tone_bias": 0.4, "call_response": 0.9, "fourth_octave": 0.0, "groove_repeats": 0.95, "riff_shapes": 0.9},
+		"resolution_secondary_weight": 1.6,
 		"rhythm_pulses_min": 11, "rhythm_pulses_max": 13,
-		"idiom_overrides": {}, "max_leap_override": null,
-		"phrase_structure": "call_response", "groove_lock": true},
+		"max_leap_override": null, "flat_arch": false},
 	{"id": "middle_eastern", "name": "Middle\nEastern",
-		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 0.9,
-		"chord_tone_nudge_chance": 0.05,
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.0, "fourth_octave": 0.0, "glissando": 0.85, "ghost_notes": 0.8},
+		"resolution_secondary_weight": 0.9,
 		"rhythm_pulses_min": 4, "rhythm_pulses_max": 8,
-		"idiom_overrides": {"glissando": {"min": 0.0, "default": 0.55, "max": 0.9}, "ghost_notes": {"min": 0.0, "default": 0.32, "max": 0.6}},
-		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+		"max_leap_override": null, "flat_arch": false},
 	{"id": "balkan", "name": "Balkan /\nGypsy",
-		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
-		"chord_tone_nudge_chance": 0.15,
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.2, "call_response": 0.0, "fourth_octave": 0.0, "riff_shapes": 0.85, "zigzag_bias": 0.85},
+		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
-		"idiom_overrides": {"riff_shapes": {"min": 0.0, "default": 0.55, "max": 0.8}, "zigzag_bias": {"min": 0.5, "default": 0.85, "max": 1.0}},
-		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+		"max_leap_override": null, "flat_arch": false},
 	{"id": "japanese", "name": "Japanese /\nEastern",
-		"accent_mode": "downbeat", "resolution_mode": "fourth_octave", "resolution_secondary_weight": 1.9,
-		"chord_tone_nudge_chance": 0.05,
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.0, "fourth_octave": 0.9, "anchor_return": 0.15},
+		"resolution_secondary_weight": 1.9,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 5,
-		"idiom_overrides": {"anchor_return": {"min": 0.0, "default": 0.05, "max": 0.2}},
-		"max_leap_override": 2, "phrase_structure": "flat_arch", "groove_lock": false},
+		"max_leap_override": 2, "flat_arch": true},
 	{"id": "jazz", "name": "Jazz",
-		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
-		"chord_tone_nudge_chance": 0.4,
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.5, "call_response": 0.0, "fourth_octave": 0.0, "zigzag_bias": 0.95},
+		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
-		"idiom_overrides": {"zigzag_bias": {"min": 0.5, "default": 0.95, "max": 1.0}},
-		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+		"max_leap_override": null, "flat_arch": false},
 ]
 
 const PALETTES := [
