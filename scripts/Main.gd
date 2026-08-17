@@ -403,6 +403,10 @@ const MUSIC_IDIOM_RANGES := {
 # watching/adjusting the sliders happen in one glance, not two panels.
 var music_style_grid: GridContainer
 var music_style_buttons: Array[Button] = []
+# Small "pairs with: <scale>" hint under each style card - purely
+# informational, never restricts which scale a player can actually load
+# alongside a style (see _refresh_style_cards()).
+var music_style_hint_labels: Array[Label] = []
 @onready var duet_button: Button = %DuetButton
 # Idiom visualizer (see docs/music-mode.md#visualizing-the-idioms) - a
 # scrolling degree-over-time contour strip plus a fading event log, so a
@@ -962,9 +966,27 @@ func _build_style_picker_row() -> void:
 
 	_build_style_cards()
 
+# Looks up a scale's display name by id for the style cards' "pairs with"
+# hint - "" for null (styles with no single best-fit scale, e.g. Western).
+func _scale_short_name(scale_id) -> String:
+	if scale_id == null:
+		return ""
+	for scale in GameData.SCALES:
+		if scale["id"] == scale_id:
+			return String(scale["name"]).replace("\n", " ")
+	return String(scale_id)
+
 func _build_style_cards() -> void:
 	for i in GameData.MUSIC_STYLES.size():
 		var style: Dictionary = GameData.MUSIC_STYLES[i]
+		# Each style gets a small cell (button + hint label stacked) rather
+		# than adding the button straight to the grid, so the "pairs with"
+		# hint travels with its own card instead of needing a second,
+		# separately-indexed row in the grid.
+		var cell := VBoxContainer.new()
+		cell.add_theme_constant_override("separation", 1)
+		music_style_grid.add_child(cell)
+
 		var card := Button.new()
 		card.custom_minimum_size = Vector2(100, 40)
 		card.focus_mode = Control.FOCUS_NONE
@@ -972,20 +994,44 @@ func _build_style_cards() -> void:
 		card.text = style["name"]
 		card.add_theme_font_size_override("font_size", 11)
 		card.pressed.connect(_on_style_button_pressed.bind(i))
-		music_style_grid.add_child(card)
+		cell.add_child(card)
 		music_style_buttons.append(card)
+
+		var hint := Label.new()
+		hint.add_theme_font_size_override("font_size", 9)
+		hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		hint.autowrap_mode = 2
+		cell.add_child(hint)
+		music_style_hint_labels.append(hint)
 	_refresh_style_cards()
 
-# Highlights whichever card matches _music_current_style - called on card
-# press and whenever Music Mode resets the style to Western on entry.
+# Highlights whichever card matches _music_current_style (on card press or
+# Music Mode resetting to Western on entry) and refreshes every card's
+# "pairs with" hint against whichever scale is *actually* loaded right now
+# (also called from _apply_scale_and_palette(), so changing scale updates
+# the hints too) - purely informational, never restricts the free
+# any-scale-with-any-style pairing Music Mode allows.
 func _refresh_style_cards() -> void:
 	if music_style_buttons.is_empty():
 		return
 	var accent: Color = GameData.THEMES[current_theme_index]["accent"]
 	var border: Color = GameData.THEMES[current_theme_index]["border"]
+	var current_scale_id: String = GameData.SCALES[current_scale_index]["id"]
 	for i in music_style_buttons.size():
-		var active: bool = GameData.MUSIC_STYLES[i]["id"] == _music_current_style.get("id", "western")
+		var style: Dictionary = GameData.MUSIC_STYLES[i]
+		var active: bool = style["id"] == _music_current_style.get("id", "western")
 		_style_pick_card(music_style_buttons[i], active, false, accent, border, 10)
+		var recommended_id = style.get("recommended_scale_id")
+		var hint: Label = music_style_hint_labels[i]
+		if recommended_id == null:
+			hint.text = "any scale"
+			hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+		elif recommended_id == current_scale_id:
+			hint.text = "✓ " + _scale_short_name(recommended_id)
+			hint.add_theme_color_override("font_color", accent)
+		else:
+			hint.text = "pairs: " + _scale_short_name(recommended_id)
+			hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
 
 # Scale and Style are picked fully independently in Music Mode (see
 # GameData.MUSIC_STYLES) - this never touches current_scale_index. Resets
@@ -1595,6 +1641,10 @@ func _apply_scale_and_palette() -> void:
 			pad.lit_color = Color.from_hsv(hue, palette["lit_sat"], palette["lit_val"])
 		pad.refresh()
 		_apply_label_contrast(note_labels[pad_names[i]], pad.base_color, pad.lit_color)
+	# Keeps the Style cards' "pairs with"/checkmark hints in sync whenever
+	# the scale changes, not just when a style is picked (see
+	# _refresh_style_cards()) - a no-op before the Tune panel's rows exist yet.
+	_refresh_style_cards()
 
 # Picks black-or-white note-label text (with a matching soft shadow) by
 # whichever contrasts better against BOTH the pad's resting and lit color -

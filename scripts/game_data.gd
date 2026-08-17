@@ -135,13 +135,21 @@ const SCALES := [
 #   flat_arch                    true uses a smaller melodic-arch bias
 #                                magnitude (gentler rise/fall) instead of
 #                                the standard one.
+#   recommended_scale_id         purely informational (Main.gd's style cards
+#                                show it as a hint) - Music Mode still lets
+#                                the player pair any of the 17 scales with
+#                                any style freely, this never restricts that.
+#                                null for styles with no single best fit
+#                                (Western works with anything; Junkanoo just
+#                                wants a bright major-key scale, not one
+#                                specific one).
 const MUSIC_STYLES := [
-	{"id": "western", "name": "Western",
+	{"id": "western", "name": "Western", "recommended_scale_id": null,
 		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.0, "call_response": 0.0, "fourth_octave": 0.0},
 		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 5, "rhythm_pulses_max": 9,
 		"max_leap_override": null, "flat_arch": false},
-	{"id": "reggae", "name": "Reggae\n(Jamaica)",
+	{"id": "reggae", "name": "Reggae\n(Jamaica)", "recommended_scale_id": "d_dorian",
 		# call_response 0.28: real and "integral" per sources, but secondary to
 		# the one-drop groove itself - horn/vocal answer phrases happen
 		# periodically, not on every phrase the way Junkanoo's do.
@@ -149,12 +157,12 @@ const MUSIC_STYLES := [
 		"resolution_secondary_weight": 2.1,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 6,
 		"max_leap_override": null, "flat_arch": false},
-	{"id": "junkanoo", "name": "Junkanoo\n(Bahamas)",
+	{"id": "junkanoo", "name": "Junkanoo\n(Bahamas)", "recommended_scale_id": "c_major_pentatonic",
 		"idiom_preset": {"offbeat_accent": 0.1, "chord_tone_bias": 0.4, "call_response": 0.85, "fourth_octave": 0.0, "groove_repeats": 0.95, "riff_shapes": 0.9},
 		"resolution_secondary_weight": 1.6,
 		"rhythm_pulses_min": 11, "rhythm_pulses_max": 13,
 		"max_leap_override": null, "flat_arch": false},
-	{"id": "middle_eastern", "name": "Middle\nEastern",
+	{"id": "middle_eastern", "name": "Middle\nEastern", "recommended_scale_id": "d_hijaz",
 		# call_response 0.12: weak/metaphorical at best - istikhbar is
 		# described as the performer "eliciting" a response from the maqam
 		# itself, a solo internal dialogue, not literally alternating voices.
@@ -162,7 +170,7 @@ const MUSIC_STYLES := [
 		"resolution_secondary_weight": 0.9,
 		"rhythm_pulses_min": 4, "rhythm_pulses_max": 8,
 		"max_leap_override": null, "flat_arch": false},
-	{"id": "balkan", "name": "Balkan /\nGypsy",
+	{"id": "balkan", "name": "Balkan /\nGypsy", "recommended_scale_id": "hungarian_minor",
 		# call_response 0.65: sources describe brass/accordion-violin
 		# call-and-response as "a fundamental characteristic" of Balkan brass
 		# - comparably central to this genre as it is to Junkanoo's.
@@ -170,7 +178,7 @@ const MUSIC_STYLES := [
 		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
 		"max_leap_override": null, "flat_arch": false},
-	{"id": "japanese", "name": "Japanese /\nEastern",
+	{"id": "japanese", "name": "Japanese /\nEastern", "recommended_scale_id": "insen",
 		# call_response 0.12: min'yo folk song genuinely has call-and-response
 		# roots (work-song kakegoe shouts), but solo shakuhachi honkyoku -
 		# closer to what this style is actually modeled on - is genuinely
@@ -180,7 +188,7 @@ const MUSIC_STYLES := [
 		"resolution_secondary_weight": 1.9,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 5,
 		"max_leap_override": 2, "flat_arch": true},
-	{"id": "jazz", "name": "Jazz",
+	{"id": "jazz", "name": "Jazz", "recommended_scale_id": "whole_tone",
 		# chord_tone_bias raised: jazz pedagogy treats chord-tone targeting as
 		# foundational ("what separates melodic solos from random scale
 		# runs"), not occasional - this idiom was sitting at the same value
