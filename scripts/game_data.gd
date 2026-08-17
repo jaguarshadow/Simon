@@ -80,18 +80,104 @@ const MODIFIERS := [
 		"levels": [{"mult": 1.5}, {"mult": 1.8}, {"mult": 2.2}, {"mult": 2.7}, {"mult": 3.5, "insured": true}]},
 ]
 
+## Real steel-tongue-drum/handpan tone fields are numbered in ascending pitch order but laid out
+## physically alternating sides of the ring ("zigzag"/"zipper" layout) - a fixed, scale-independent
+## pattern, not something re-derived per scale. HANDPAN_RING_ORDER encodes that: which scale degree
+## sits at each physical ring position, walking clockwise from the tonic. Every scale uses it.
+const HANDPAN_RING_ORDER := [0, 2, 4, 6, 7, 5, 3, 1]
+
 const SCALES := [
-	{"id": "d_minor_pentatonic", "name": "D Minor\nPentatonic", "tones": [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 440.0], "notes": ["D", "F", "G", "A", "C", "D", "F", "A"], "ring_order": [0, 2, 4, 1, 6, 3, 7, 5]},
-	{"id": "c_major_pentatonic", "name": "C Major\nPentatonic", "tones": [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], "notes": ["C", "D", "E", "G", "A", "C", "D", "E"], "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "d_akebono", "name": "D Akebono", "tones": [293.66, 329.63, 349.23, 440.0, 466.16, 587.33, 659.25, 698.46], "notes": ["D", "E", "F", "A", "Bb", "D", "E", "F"], "ring_order": [0, 1, 6, 3, 2, 7, 4, 5]},
-	{"id": "d_minor", "name": "D Minor\nDiatonic", "tones": [146.83, 164.81, 174.61, 196.0, 220.0, 233.08, 261.63, 293.66], "notes": ["D", "E", "F", "G", "A", "Bb", "C", "D"], "unlock": {"type": "round", "value": 10}, "ring_order": [0, 3, 5, 2, 6, 1, 4, 7]},
-	{"id": "e_minor_pentatonic", "name": "E Minor\nPentatonic", "tones": [164.81, 196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0], "notes": ["E", "G", "A", "B", "D", "E", "G", "A"], "unlock": {"type": "round", "value": 5}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "g_major_pentatonic", "name": "G Major\nPentatonic", "tones": [196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0, 493.88], "notes": ["G", "A", "B", "D", "E", "G", "A", "B"], "unlock": {"type": "score", "value": 500}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "c_major_diatonic", "name": "C Major\nDiatonic", "tones": [130.81, 146.83, 164.81, 174.61, 196.0, 220.0, 246.94, 261.63], "notes": ["C", "D", "E", "F", "G", "A", "B", "C"], "unlock": {"type": "combo", "value": 15}, "ring_order": [0, 3, 1, 5, 2, 6, 4, 7]},
-	{"id": "chromatic_run", "name": "Chromatic\nRun", "tones": [130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.0, 196.0], "notes": ["C", "C#", "D", "D#", "E", "F", "F#", "G"], "unlock": {"type": "round", "value": 15}, "ring_order": [0, 4, 1, 6, 3, 7, 2, 5]},
-	{"id": "a_minor_pentatonic", "name": "A Minor\nPentatonic", "tones": [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33], "notes": ["A", "C", "D", "E", "G", "A", "C", "D"], "unlock": {"type": "round", "value": 25}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
-	{"id": "a_akebono_pentatonic", "name": "A Akebono\nPentatonic", "tones": [220.0, 246.94, 261.63, 329.63, 349.23, 440.0, 493.88, 523.25], "notes": ["A", "B", "C", "E", "F", "A", "B", "C"], "unlock": {"type": "score", "value": 3000}, "ring_order": [0, 1, 6, 3, 2, 7, 4, 5]},
-	{"id": "e_major_pentatonic", "name": "E Major\nPentatonic", "tones": [164.81, 185.0, 207.65, 246.94, 277.18, 329.63, 369.99, 415.3], "notes": ["E", "F#", "G#", "B", "C#", "E", "F#", "G#"], "unlock": {"type": "combo", "value": 25}, "ring_order": [0, 2, 7, 4, 1, 6, 3, 5]},
+	{"id": "d_minor_pentatonic", "name": "D Minor\nPentatonic", "tones": [146.83, 174.61, 196.0, 220.0, 261.63, 293.66, 349.23, 440.0], "notes": ["D", "F", "G", "A", "C", "D", "F", "A"], "ring_order": HANDPAN_RING_ORDER},
+	{"id": "c_major_pentatonic", "name": "C Major\nPentatonic", "tones": [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25], "notes": ["C", "D", "E", "G", "A", "C", "D", "E"], "ring_order": HANDPAN_RING_ORDER},
+	{"id": "d_akebono", "name": "D Akebono", "tones": [293.66, 329.63, 349.23, 440.0, 466.16, 587.33, 659.25, 698.46], "notes": ["D", "E", "F", "A", "Bb", "D", "E", "F"], "ring_order": HANDPAN_RING_ORDER},
+	{"id": "d_minor", "name": "D Minor\nDiatonic", "tones": [146.83, 164.81, 174.61, 196.0, 220.0, 233.08, 261.63, 293.66], "notes": ["D", "E", "F", "G", "A", "Bb", "C", "D"], "unlock": {"type": "round", "value": 10}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "e_minor_pentatonic", "name": "E Minor\nPentatonic", "tones": [164.81, 196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0], "notes": ["E", "G", "A", "B", "D", "E", "G", "A"], "unlock": {"type": "round", "value": 5}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "g_major_pentatonic", "name": "G Major\nPentatonic", "tones": [196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0, 493.88], "notes": ["G", "A", "B", "D", "E", "G", "A", "B"], "unlock": {"type": "score", "value": 500}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "c_major_diatonic", "name": "C Major\nDiatonic", "tones": [130.81, 146.83, 164.81, 174.61, 196.0, 220.0, 246.94, 261.63], "notes": ["C", "D", "E", "F", "G", "A", "B", "C"], "unlock": {"type": "combo", "value": 15}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "chromatic_run", "name": "Chromatic\nRun", "tones": [130.81, 138.59, 146.83, 155.56, 164.81, 174.61, 185.0, 196.0], "notes": ["C", "C#", "D", "D#", "E", "F", "F#", "G"], "unlock": {"type": "round", "value": 15}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "a_minor_pentatonic", "name": "A Minor\nPentatonic", "tones": [220.0, 261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33], "notes": ["A", "C", "D", "E", "G", "A", "C", "D"], "unlock": {"type": "round", "value": 25}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "a_akebono_pentatonic", "name": "A Akebono\nPentatonic", "tones": [220.0, 246.94, 261.63, 329.63, 349.23, 440.0, 493.88, 523.25], "notes": ["A", "B", "C", "E", "F", "A", "B", "C"], "unlock": {"type": "score", "value": 3000}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "e_major_pentatonic", "name": "E Major\nPentatonic", "tones": [164.81, 185.0, 207.65, 246.94, 277.18, 329.63, 369.99, 415.3], "notes": ["E", "F#", "G#", "B", "C#", "E", "F#", "G#"], "unlock": {"type": "combo", "value": 25}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "d_dorian", "name": "D Dorian", "tones": [146.83, 164.81, 174.61, 196.0, 220.0, 246.94, 261.63, 293.66], "notes": ["D", "E", "F", "G", "A", "B", "C", "D"], "unlock": {"type": "round", "value": 20}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "blues_hexatonic", "name": "A Blues", "tones": [220.0, 261.63, 293.66, 311.13, 329.63, 392.0, 440.0, 523.25], "notes": ["A", "C", "D", "Eb", "E", "G", "A", "C"], "unlock": {"type": "score", "value": 1000}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "d_hijaz", "name": "D Hijaz", "tones": [146.83, 155.56, 185.0, 196.0, 220.0, 233.08, 261.63, 293.66], "notes": ["D", "Eb", "F#", "G", "A", "Bb", "C", "D"], "unlock": {"type": "combo", "value": 20}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "hungarian_minor", "name": "E Hungarian\nMinor", "tones": [164.81, 185.0, 196.0, 233.08, 246.94, 261.63, 311.13, 329.63], "notes": ["E", "F#", "G", "A#", "B", "C", "D#", "E"], "unlock": {"type": "round", "value": 30}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "insen", "name": "C Insen", "tones": [261.63, 277.18, 349.23, 392.0, 466.16, 523.25, 554.37, 698.46], "notes": ["C", "Db", "F", "G", "Bb", "C", "Db", "F"], "unlock": {"type": "score", "value": 4000}, "ring_order": HANDPAN_RING_ORDER},
+	{"id": "whole_tone", "name": "C Whole\nTone", "tones": [261.63, 293.66, 329.63, 369.99, 415.3, 466.16, 523.25, 587.33], "notes": ["C", "D", "E", "F#", "G#", "A#", "C", "D"], "unlock": {"type": "combo", "value": 30}, "ring_order": HANDPAN_RING_ORDER},
+]
+
+# Music Mode "Style" presets - reparametrize the generator (Main.gd's
+# _music_*/_normal_* functions, SequenceGenerator's resolution weighting)
+# per real-world melodic idiom, without new instruments or per-style
+# exception code. Every entry shares the exact same field shape; different
+# styles pick different *values*, never a field/guard the others lack -
+# see docs/music-mode.md#style-presets for the full research writeup and
+# per-style reasoning.
+#
+#   accent_mode                 "downbeat" | "offbeat" - which rhythm pulse
+#                                gets the accent (see Main.gd's
+#                                _music_is_accented_step()).
+#   resolution_mode              "triad" | "fourth_octave" - which degrees
+#                                count as the secondary tonal-hierarchy tier
+#                                (see SequenceGenerator.scale_degree_weight()).
+#   resolution_secondary_weight  overrides that tier's weight relative to
+#                                the tonic (MUSIC_DEGREE_WEIGHT_TRIAD=1.5 is
+#                                the unmodified baseline; higher = stronger/
+#                                more bassline-like pull, lower = looser).
+#   chord_tone_nudge_chance      per-note (not just strong-beat) chance to
+#                                nudge onto the nearest chord tone.
+#   rhythm_pulses_min/max        Euclidean onset count out of 16 steps.
+#   idiom_overrides              sparse {idiom_key: {min,default,max}}
+#                                merged over MUSIC_IDIOM_RANGES.
+#   max_leap_override            overrides the narrow/pentatonic max-leap
+#                                pick when non-null.
+#   phrase_structure              "arch" | "flat_arch" | "call_response".
+#   groove_lock                  true forces groove_repeats/riff_shapes
+#                                near-permanently on instead of the normal
+#                                per-bar roll (Junkanoo's locked ostinato).
+const MUSIC_STYLES := [
+	{"id": "western", "name": "Western",
+		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
+		"chord_tone_nudge_chance": 0.0,
+		"rhythm_pulses_min": 5, "rhythm_pulses_max": 9,
+		"idiom_overrides": {}, "max_leap_override": null,
+		"phrase_structure": "arch", "groove_lock": false},
+	{"id": "reggae", "name": "Reggae\n(Jamaica)",
+		"accent_mode": "offbeat", "resolution_mode": "triad", "resolution_secondary_weight": 2.1,
+		"chord_tone_nudge_chance": 0.75,
+		"rhythm_pulses_min": 3, "rhythm_pulses_max": 6,
+		"idiom_overrides": {"groove_repeats": {"min": 0.35, "default": 0.75, "max": 0.95}},
+		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+	{"id": "junkanoo", "name": "Junkanoo\n(Bahamas)",
+		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.6,
+		"chord_tone_nudge_chance": 0.4,
+		"rhythm_pulses_min": 11, "rhythm_pulses_max": 13,
+		"idiom_overrides": {}, "max_leap_override": null,
+		"phrase_structure": "call_response", "groove_lock": true},
+	{"id": "middle_eastern", "name": "Middle\nEastern",
+		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 0.9,
+		"chord_tone_nudge_chance": 0.05,
+		"rhythm_pulses_min": 4, "rhythm_pulses_max": 8,
+		"idiom_overrides": {"glissando": {"min": 0.0, "default": 0.55, "max": 0.9}, "ghost_notes": {"min": 0.0, "default": 0.32, "max": 0.6}},
+		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+	{"id": "balkan", "name": "Balkan /\nGypsy",
+		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
+		"chord_tone_nudge_chance": 0.15,
+		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
+		"idiom_overrides": {"riff_shapes": {"min": 0.0, "default": 0.55, "max": 0.8}, "zigzag_bias": {"min": 0.5, "default": 0.85, "max": 1.0}},
+		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
+	{"id": "japanese", "name": "Japanese /\nEastern",
+		"accent_mode": "downbeat", "resolution_mode": "fourth_octave", "resolution_secondary_weight": 1.9,
+		"chord_tone_nudge_chance": 0.05,
+		"rhythm_pulses_min": 3, "rhythm_pulses_max": 5,
+		"idiom_overrides": {"anchor_return": {"min": 0.0, "default": 0.05, "max": 0.2}},
+		"max_leap_override": 2, "phrase_structure": "flat_arch", "groove_lock": false},
+	{"id": "jazz", "name": "Jazz",
+		"accent_mode": "downbeat", "resolution_mode": "triad", "resolution_secondary_weight": 1.5,
+		"chord_tone_nudge_chance": 0.4,
+		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
+		"idiom_overrides": {"zigzag_bias": {"min": 0.5, "default": 0.95, "max": 1.0}},
+		"max_leap_override": null, "phrase_structure": "arch", "groove_lock": false},
 ]
 
 const PALETTES := [

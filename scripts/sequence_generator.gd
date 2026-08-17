@@ -91,30 +91,51 @@ static func semitones_from_tonic(degree: int, scale: Dictionary) -> int:
 	return semitones + 12 if semitones < 0 else semitones
 
 # Tonal-hierarchy weight for a degree: tonic (0 or 12 semitones - i.e. any
-# octave) highest, minor/major third (3-4 semitones) or perfect fifth
-# (7 semitones) next, everything else (passing tones - 2nds, 4ths, 6ths,
-# 7ths) excluded from resolution entirely (weight 0). Degrees at either
+# octave) highest, then a secondary tier next, everything else (passing
+# tones) excluded from resolution entirely (weight 0). Degrees at either
 # edge of the pad range (0 or PAD_COUNT-1) get discounted, since
 # reflect_degree() gives a boundary degree exactly one neighbor - see
 # docs/music-mode.md#note-distribution-bias-fix.
-static func scale_degree_weight(degree: int, scale: Dictionary) -> float:
+#
+# `style` (optional, defaults to {} so every non-Music-Mode call site is
+# unaffected) picks which degrees count as the secondary tier and how
+# strongly they're weighted relative to the tonic - see
+# GameData.MUSIC_STYLES. Two modes, both computed generically from the
+# scale's own tuned frequencies (no scale-type guard, works on any scale):
+#   "triad" (default) - minor/major third or perfect fifth (3, 4, or 7
+#   semitones from the tonic), the Western tonal-hierarchy tier.
+#   "fourth_octave" - the perfect 4th (5 semitones) instead, per Koizumi's
+#   Japanese nuclear-tone theory (docs cite this under the Japanese/Eastern
+#   style). The octave itself already falls under the tonic tier (0
+#   semitones after the mod-12 fold), so it needs no separate case here.
+# `style.resolution_secondary_weight` overrides the tier's weight (defaults
+# to MUSIC_DEGREE_WEIGHT_TRIAD) - e.g. Reggae raises it toward the tonic
+# weight for a stronger, bassline-like pull; Middle Eastern lowers it for a
+# looser, less-resolved feel. Same one mechanism produces both effects.
+static func scale_degree_weight(degree: int, scale: Dictionary, style: Dictionary = {}) -> float:
+	var resolution_mode: String = style.get("resolution_mode", "triad")
+	var secondary_weight: float = style.get("resolution_secondary_weight", MUSIC_DEGREE_WEIGHT_TRIAD)
 	var semitones := semitones_from_tonic(degree, scale)
 	var weight := 0.0
 	if semitones == 0:
 		weight = MUSIC_DEGREE_WEIGHT_TONIC
-	elif semitones == 3 or semitones == 4 or semitones == 7:
-		weight = MUSIC_DEGREE_WEIGHT_TRIAD
+	elif resolution_mode == "fourth_octave":
+		if semitones != 5:
+			return 0.0
+		weight = secondary_weight
 	else:
-		return 0.0
+		if semitones != 3 and semitones != 4 and semitones != 7:
+			return 0.0
+		weight = secondary_weight
 	if degree == 0 or degree == PAD_COUNT - 1:
 		weight *= MUSIC_DEGREE_WEIGHT_BOUNDARY_FACTOR
 	return weight
 
-static func pick_resolution_degree(scale: Dictionary) -> int:
+static func pick_resolution_degree(scale: Dictionary, style: Dictionary = {}) -> int:
 	var weights: Array[float] = []
 	var total := 0.0
 	for d in PAD_COUNT:
-		var w := scale_degree_weight(d, scale)
+		var w := scale_degree_weight(d, scale, style)
 		weights.append(w)
 		total += w
 	if total <= 0.0:
@@ -126,19 +147,19 @@ static func pick_resolution_degree(scale: Dictionary) -> int:
 			return d
 	return PAD_COUNT - 1
 
-static func is_resolution_degree(degree: int, scale: Dictionary) -> bool:
-	return scale_degree_weight(degree, scale) > 0.0
+static func is_resolution_degree(degree: int, scale: Dictionary, style: Dictionary = {}) -> bool:
+	return scale_degree_weight(degree, scale, style) > 0.0
 
 # Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-
 # strong-beats): standard tonal/counterpoint practice puts chord tones on
 # strong metrical positions and reserves passing tones for weak ones.
 # Finds the closest degree with a nonzero scale_degree_weight() (a local
 # nudge, not a jump to a weighted-random one).
-static func nearest_chord_tone_degree(degree: int, scale: Dictionary) -> int:
+static func nearest_chord_tone_degree(degree: int, scale: Dictionary, style: Dictionary = {}) -> int:
 	var best := degree
 	var best_dist := PAD_COUNT
 	for d in PAD_COUNT:
-		if scale_degree_weight(d, scale) <= 0.0:
+		if scale_degree_weight(d, scale, style) <= 0.0:
 			continue
 		var dist := absi(d - degree)
 		if dist < best_dist:
@@ -168,7 +189,7 @@ static func ring_side(degree: int, scale: Dictionary) -> int:
 # free lookup, so that costs nothing and keeps this function's
 # randf()/randi_range() call order (and therefore the generated melodies)
 # stable regardless of caller.
-static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: int, last_was_leap: bool, current_degree: int, scale: Dictionary, zigzag_bias: float, arch_direction: int) -> Dictionary:
+static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: int, last_was_leap: bool, current_degree: int, scale: Dictionary, zigzag_bias: float, arch_direction: int, arch_bias: float = MUSIC_ARCH_BIAS) -> Dictionary:
 	var repeat_chance: float = BASE_REPEAT_CHANCE * pow(REPEAT_DECAY, float(repeat_streak - 1))
 	var step_chance := (1.0 - repeat_chance) * STEP_TO_NON_REPEAT_RATIO
 	var r := randf()
@@ -233,6 +254,6 @@ static func walk_next_step(max_leap: int, repeat_streak: int, last_direction: in
 	# Melodic arch (see docs/music-mode.md#melodic-arch) - not applied to a
 	# gap-fill reversal, since that's a hard contour rule (Narmour) the arch
 	# shouldn't second-guess.
-	if not is_gap_fill and randf() < MUSIC_ARCH_BIAS:
+	if not is_gap_fill and randf() < arch_bias:
 		direction = arch_direction
 	return {"delta": direction * magnitude, "direction": direction, "was_leap": magnitude >= 2, "used_zigzag": used_zigzag}

@@ -124,7 +124,7 @@ const MUSIC_PULSES_MIN := 5
 const MUSIC_PULSES_MAX := 9
 # Scales with a half-step or tritone in them - capped to a smaller max leap
 # than the (dissonance-proof) pentatonic scales to avoid the harshest jumps.
-const MUSIC_NARROW_LEAP_SCALES := ["d_minor", "c_major_diatonic", "chromatic_run"]
+const MUSIC_NARROW_LEAP_SCALES := ["d_minor", "c_major_diatonic", "chromatic_run", "d_dorian", "d_hijaz", "hungarian_minor", "whole_tone"]
 const MUSIC_PENTATONIC_MAX_LEAP := 4
 const MUSIC_NARROW_MAX_LEAP := 3
 const MUSIC_PHRASE_BARS := 4
@@ -383,6 +383,17 @@ const MUSIC_IDIOM_RANGES := {
 @onready var music_tune_button: Button = %TuneButton
 @onready var music_tune_panel: Control = $MusicTunePanel
 @onready var music_tune_close_button: Button = %MusicTuneCloseButton
+# Music Style panel (see GameData.MUSIC_STYLES) - built entirely in code from
+# _build_music_style_panel()/_build_style_cards(), same reasoning as
+# _build_scale_cards(): a handful of near-identical cards generated from data
+# is far less error-prone than hand-authoring them in the .tscn. A sibling of
+# MusicTunePanel, not nested inside it, so the Tune panel's existing
+# hand-built layout is untouched.
+var music_style_button: Button
+var music_style_panel: Control
+var music_style_close_button: Button
+var music_style_grid: GridContainer
+var music_style_buttons: Array[Button] = []
 @onready var duet_button: Button = %DuetButton
 # Idiom visualizer (see docs/music-mode.md#visualizing-the-idioms) - a
 # scrolling degree-over-time contour strip plus a fading event log, so a
@@ -443,6 +454,25 @@ var _normal_repeat_streak := 1
 var _normal_riff: Array = []
 var _normal_riff_index := 0
 var _normal_riff_base := 0
+# Music Mode "Style" presets (see GameData.MUSIC_STYLES) - _music_current_style
+# is the player's pick in Music Mode's own Style panel (session-only, reset
+# to Western on every fresh Music Mode entry); _run_current_style is rolled
+# once at the start of each Normal/Chaos/Duet run. Kept as two separate
+# fields (rather than one shared "current style") so Music Mode's picker can
+# never leak into a Normal/Chaos/Duet run and vice versa - each mode reads
+# only its own via _active_music_style().
+var _music_current_style: Dictionary = GameData.MUSIC_STYLES[0]
+var _run_current_style: Dictionary = GameData.MUSIC_STYLES[0]
+# Call-and-response phrase structuring (Junkanoo's "call_response" phrase_structure,
+# see GameData.MUSIC_STYLES) - caches the first half of a phrase's degree
+# sequence so the second half can echo it instead of arching. Cleared by
+# _music_reset_walk().
+var _music_call_phrase: Array[int] = []
+# Which MUSIC_RIFF_SHAPES entry a groove_lock style (Junkanoo) has settled
+# on for this session - picked once, lazily, on first use; -1 means not yet
+# picked. Reset by _music_reset_walk() so a new session can land on a
+# different riff.
+var _music_locked_riff_shape_index := -1
 var _music_repeat_streak := 1
 var _music_current_degree := 0
 var _music_last_direction := 0
@@ -473,6 +503,7 @@ const MUSIC_VIZ_TAG_COLORS := {
 	"ghost": Color(0.6, 0.65, 0.78),
 	"glissando": Color(0.4, 0.9, 0.95),
 	"zigzag": Color(0.75, 1.0, 0.3),
+	"response": Color(1.0, 0.55, 0.15),
 }
 # Ripple pulse on the physical pad itself when an idiom fires (see
 # docs/music-mode.md#visualizing-the-idioms) - colored by MUSIC_VIZ_TAG_COLORS,
@@ -491,6 +522,7 @@ const MUSIC_VIZ_TAG_LABELS := {
 	"ghost": "ghost note",
 	"glissando": "glissando",
 	"zigzag": "zigzag cross",
+	"response": "call & response",
 }
 var _music_viz_history: Array[Dictionary] = []
 var _music_last_bar_tags: Array[String] = []
@@ -666,6 +698,7 @@ func _ready() -> void:
 	cash_out_button.pressed.connect(_on_cash_out_button_pressed)
 	for i in modifier_buttons.size():
 		modifier_buttons[i].pressed.connect(_on_modifier_button_pressed.bind(i))
+	_build_music_style_panel()
 	_build_scale_cards()
 	_build_palette_and_theme_buttons()
 	for i in palette_buttons.size():
@@ -817,6 +850,150 @@ func _build_scale_cards() -> void:
 			unlock_label.text = _requirement_text(scale["unlock"])
 		vbox.add_child(unlock_label)
 		scale_card_unlock_labels.append(unlock_label)
+
+# Music Style panel/cards (see GameData.MUSIC_STYLES) - built entirely in
+# code, same reasoning as _build_scale_cards() just above: a handful of
+# near-identical cards generated from data is far less error-prone than
+# hand-authoring them in the .tscn. A sibling of MusicTunePanel (not nested
+# inside it), reachable only from MusicBar's new StyleButton, so it's never
+# exposed outside Music Mode. No unlock gating - styles are free/always
+# available - so cards only ever show active/inactive, never a lock.
+func _build_music_style_panel() -> void:
+	music_style_panel = Control.new()
+	music_style_panel.name = "MusicStylePanel"
+	music_style_panel.visible = false
+	music_style_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(music_style_panel)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.72)
+	music_style_panel.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	music_style_panel.add_child(center)
+
+	var content := VBoxContainer.new()
+	content.custom_minimum_size = Vector2(460, 0)
+	content.add_theme_constant_override("separation", 12)
+	center.add_child(content)
+
+	var panel_bg := PanelContainer.new()
+	panel_bg.custom_minimum_size = Vector2(460, 0)
+	var panel_sb := StyleBoxFlat.new()
+	panel_sb.bg_color = Color(0.08, 0.09, 0.11, 0.98)
+	panel_sb.set_corner_radius_all(14)
+	panel_sb.set_border_width_all(1)
+	panel_sb.border_color = Color(1, 1, 1, 0.08)
+	panel_bg.add_theme_stylebox_override("panel", panel_sb)
+	content.add_child(panel_bg)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel_bg.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Music Style"
+	title.add_theme_font_size_override("font_size", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var subtitle := Label.new()
+	subtitle.text = "Reparametrizes rhythm, accent, and melodic resolution on top of whichever scale is loaded - pick any combination."
+	subtitle.add_theme_font_size_override("font_size", 12)
+	subtitle.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	subtitle.autowrap_mode = 2
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(subtitle)
+
+	music_style_grid = GridContainer.new()
+	music_style_grid.columns = 2
+	music_style_grid.add_theme_constant_override("h_separation", 10)
+	music_style_grid.add_theme_constant_override("v_separation", 10)
+	vbox.add_child(music_style_grid)
+
+	music_style_close_button = Button.new()
+	music_style_close_button.text = "Close"
+	music_style_close_button.focus_mode = Control.FOCUS_NONE
+	music_style_close_button.pressed.connect(_on_music_style_close_pressed)
+	vbox.add_child(music_style_close_button)
+
+	music_style_button = Button.new()
+	music_style_button.text = "Style"
+	music_style_button.focus_mode = Control.FOCUS_NONE
+	music_style_button.pressed.connect(_on_music_style_button_pressed)
+	music_bar.add_child(music_style_button)
+
+	_build_style_cards()
+
+func _build_style_cards() -> void:
+	for i in GameData.MUSIC_STYLES.size():
+		var style: Dictionary = GameData.MUSIC_STYLES[i]
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(210, 64)
+		card.focus_mode = Control.FOCUS_NONE
+		card.clip_contents = true
+		card.pressed.connect(_on_style_button_pressed.bind(i))
+		music_style_grid.add_child(card)
+		music_style_buttons.append(card)
+
+		var margin := MarginContainer.new()
+		margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_theme_constant_override("margin_left", 12)
+		margin.add_theme_constant_override("margin_right", 12)
+		margin.add_theme_constant_override("margin_top", 8)
+		margin.add_theme_constant_override("margin_bottom", 8)
+		card.add_child(margin)
+
+		var vbox := VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 4)
+		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_child(vbox)
+
+		var name_label := Label.new()
+		name_label.text = style["name"]
+		name_label.add_theme_font_size_override("font_size", 14)
+		name_label.autowrap_mode = 2
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(name_label)
+	_refresh_style_cards()
+
+# Highlights whichever card matches _music_current_style - called on card
+# press and whenever Music Mode resets the style to Western on entry.
+func _refresh_style_cards() -> void:
+	if music_style_buttons.is_empty():
+		return
+	var accent: Color = GameData.THEMES[current_theme_index]["accent"]
+	var border: Color = GameData.THEMES[current_theme_index]["border"]
+	for i in music_style_buttons.size():
+		var active: bool = GameData.MUSIC_STYLES[i]["id"] == _music_current_style.get("id", "western")
+		_style_pick_card(music_style_buttons[i], active, false, accent, border, 10)
+
+func _on_music_style_button_pressed() -> void:
+	music_style_panel.visible = true
+
+func _on_music_style_close_pressed() -> void:
+	music_style_panel.visible = false
+
+# Scale and Style are picked fully independently in Music Mode (see
+# GameData.MUSIC_STYLES) - this never touches current_scale_index. Resets
+# the walk for a clean transition rather than letting the new style's
+# rhythm/resolution rules apply mid-bar.
+func _on_style_button_pressed(index: int) -> void:
+	_music_current_style = GameData.MUSIC_STYLES[index]
+	_refresh_style_cards()
+	if music_mode:
+		_music_reset_walk()
+		_music_viz_log_event("style: " + String(_music_current_style["name"]).replace("\n", " "))
 
 func _build_palette_and_theme_buttons() -> void:
 	for i in GameData.PALETTES.size():
@@ -1030,8 +1207,15 @@ func _reset_music_idiom_sliders() -> void:
 # probability/bias value the Music Mode generators use - see the
 # MUSIC_IDIOM_KEYS declaration for why 0.5 always reproduces the tuned
 # default, and why this is two lerps (0..0.5 and 0.5..1) instead of one.
+# The active Style preset (see GameData.MUSIC_STYLES) can sparsely override
+# an idiom's {min,default,max} - e.g. Reggae raises groove_repeats' whole
+# range - merged in before the lerp so the Tune panel slider still applies
+# relative to the style's own range, not the base one underneath it.
 func _music_idiom_value(key: String) -> float:
 	var idiom_range: Dictionary = MUSIC_IDIOM_RANGES[key]
+	var overrides: Dictionary = _active_music_style().get("idiom_overrides", {})
+	if overrides.has(key):
+		idiom_range = overrides[key]
 	var slider: float = music_idiom_levels[key]
 	if slider <= 0.5:
 		return lerpf(idiom_range["min"], idiom_range["default"], slider / 0.5)
@@ -1867,6 +2051,12 @@ func _on_music_button_pressed() -> void:
 		settings_button.disabled = false
 		_set_pads_disabled(true)
 		_reset_music_idiom_sliders()
+		# Style choice is session-only, same as the Tune panel sliders - every
+		# fresh Music Mode entry starts back on Western regardless of what was
+		# picked last time (see GameData.MUSIC_STYLES).
+		_music_current_style = GameData.MUSIC_STYLES[0]
+		if music_style_grid:
+			_refresh_style_cards()
 	)
 	_music_loop()
 
@@ -1904,9 +2094,15 @@ func _euclidean_rhythm(pulses: int, steps: int) -> Array[bool]:
 	return SequenceGenerator.euclidean_rhythm(pulses, steps)
 
 # One bar's worth of onsets for a Music Mode phrase - pulse count re-rolled
-# each call so successive bars don't feel mechanically identical.
+# each call so successive bars don't feel mechanically identical. Range
+# comes from the active Style preset (Western's matches the original
+# MUSIC_PULSES_MIN/MAX exactly; Junkanoo's is much denser, Reggae's much
+# sparser - see GameData.MUSIC_STYLES).
 func _generate_music_rhythm() -> Array[bool]:
-	var pulses := randi_range(MUSIC_PULSES_MIN, MUSIC_PULSES_MAX)
+	var style := _active_music_style()
+	var pulses_min: int = style.get("rhythm_pulses_min", MUSIC_PULSES_MIN)
+	var pulses_max: int = style.get("rhythm_pulses_max", MUSIC_PULSES_MAX)
+	var pulses := randi_range(pulses_min, pulses_max)
 	return _euclidean_rhythm(pulses, MUSIC_RHYTHM_STEPS)
 
 # The tonal-hierarchy resolution math (reflect_degree/semitones_from_tonic/
@@ -1921,17 +2117,26 @@ func _reflect_degree(raw_target: int) -> int:
 func _semitones_from_tonic(degree: int, scale: Dictionary) -> int:
 	return SequenceGenerator.semitones_from_tonic(degree, scale)
 
+# Which Style preset is "live" right now - Music Mode's own player-picked
+# style while Music Mode is running, otherwise the style rolled for the
+# current Normal/Chaos/Duet run. Every call site that needs to know the
+# active style (idiom values, resolution weighting, rhythm density, accent
+# placement) goes through this single accessor rather than branching on
+# music_mode itself, so a style is threaded the same way everywhere.
+func _active_music_style() -> Dictionary:
+	return _music_current_style if music_mode else _run_current_style
+
 func _scale_degree_weight(degree: int, scale: Dictionary) -> float:
-	return SequenceGenerator.scale_degree_weight(degree, scale)
+	return SequenceGenerator.scale_degree_weight(degree, scale, _active_music_style())
 
 func _pick_resolution_degree(scale: Dictionary) -> int:
-	return SequenceGenerator.pick_resolution_degree(scale)
+	return SequenceGenerator.pick_resolution_degree(scale, _active_music_style())
 
 func _is_resolution_degree(degree: int, scale: Dictionary) -> bool:
-	return SequenceGenerator.is_resolution_degree(degree, scale)
+	return SequenceGenerator.is_resolution_degree(degree, scale, _active_music_style())
 
 func _nearest_chord_tone_degree(degree: int, scale: Dictionary) -> int:
-	return SequenceGenerator.nearest_chord_tone_degree(degree, scale)
+	return SequenceGenerator.nearest_chord_tone_degree(degree, scale, _active_music_style())
 
 func _music_reset_walk() -> void:
 	# Random starting degree, not always the tonic - so each Music/Duet
@@ -1944,6 +2149,8 @@ func _music_reset_walk() -> void:
 	_music_bar_index = 0
 	_music_repeat_streak = 1
 	_music_groove_bars_left = 0
+	_music_call_phrase = []
+	_music_locked_riff_shape_index = -1
 	_music_degree_counts = {}
 	_music_notes_logged = 0
 	_music_viz_history.clear()
@@ -1958,12 +2165,61 @@ func _music_reset_walk() -> void:
 # Delegates to SequenceGenerator.walk_next_step() - see that file for the
 # algorithm and rationale. Fetches the current scale here since the static
 # version takes it explicitly rather than reading current_scale_index.
-func _walk_next_step(max_leap: int, repeat_streak: int, last_direction: int, last_was_leap: bool, current_degree: int, zigzag_bias: float, arch_direction: int) -> Dictionary:
+func _walk_next_step(max_leap: int, repeat_streak: int, last_direction: int, last_was_leap: bool, current_degree: int, zigzag_bias: float, arch_direction: int, arch_bias: float = MUSIC_ARCH_BIAS) -> Dictionary:
 	var scale: Dictionary = GameData.SCALES[current_scale_index]
-	return SequenceGenerator.walk_next_step(max_leap, repeat_streak, last_direction, last_was_leap, current_degree, scale, zigzag_bias, arch_direction)
+	return SequenceGenerator.walk_next_step(max_leap, repeat_streak, last_direction, last_was_leap, current_degree, scale, zigzag_bias, arch_direction, arch_bias)
+
+# "flat_arch" (Japanese/Eastern style - see GameData.MUSIC_STYLES) uses the
+# same rise-then-fall mechanism as "arch" with a smaller bias magnitude,
+# rather than a separate code path - a gentler nudge toward the phrase's
+# trajectory, matching the style's generally more spacious, less directional
+# melodic motion.
+const MUSIC_ARCH_BIAS_FLAT := 0.12
+# Junkanoo's "groove_lock" (see GameData.MUSIC_STYLES) re-arms the groove
+# hold for many bars at a time instead of the normal MUSIC_GROOVE_HOLD_BARS=2,
+# so the dense ostinato rhythm genuinely repeats for most/all of a listening
+# session rather than just a couple of bars - "one dense fixed ostinato,"
+# not "usually holds."
+const MUSIC_GROOVE_HOLD_BARS_LOCKED := 16
+
+# Which physical rhythm step (0..MUSIC_RHYTHM_STEPS-1) gets the accent this
+# bar, per the active style's accent_mode (see GameData.MUSIC_STYLES).
+# "downbeat" is always step 0 - the Euclidean generator's construction
+# guarantees an onset there (see _euclidean_rhythm()). "offbeat" (Reggae's
+# one-drop) targets the onset nearest step 12 (beat 3 of a 4-beat bar)
+# instead, excluding step 0 itself, falling back to the first onset it finds
+# if a sparse pattern happens to have none near there.
+func _music_accent_step_index(rhythm: Array[bool]) -> int:
+	if _active_music_style().get("accent_mode", "downbeat") == "downbeat":
+		return 0
+	var target := int(MUSIC_RHYTHM_STEPS * 3.0 / 4.0)
+	var best := -1
+	var best_dist := MUSIC_RHYTHM_STEPS
+	for step_index in rhythm.size():
+		if step_index == 0 or not rhythm[step_index]:
+			continue
+		var dist := absi(step_index - target)
+		if dist < best_dist:
+			best_dist = dist
+			best = step_index
+	return best if best >= 0 else 0
+
+# Converts a physical step index into its position among the bar's onsets in
+# playback order (pulse index) - _generate_music_bar_melody() only knows
+# pulse order, not physical step positions, so this is how it learns which
+# generated note corresponds to the accented step.
+func _music_pulse_index_for_step(rhythm: Array[bool], step_index: int) -> int:
+	var pulse_index := 0
+	for i in rhythm.size():
+		if rhythm[i]:
+			if i == step_index:
+				return pulse_index
+			pulse_index += 1
+	return 0
 
 func _music_next_delta(max_leap: int) -> int:
-	var step := _walk_next_step(max_leap, _music_repeat_streak, _music_last_direction, _music_last_was_leap, _music_current_degree, _music_idiom_value("zigzag_bias"), _music_arch_direction())
+	var arch_bias := MUSIC_ARCH_BIAS_FLAT if _active_music_style().get("phrase_structure", "arch") == "flat_arch" else MUSIC_ARCH_BIAS
+	var step := _walk_next_step(max_leap, _music_repeat_streak, _music_last_direction, _music_last_was_leap, _music_current_degree, _music_idiom_value("zigzag_bias"), _music_arch_direction(), arch_bias)
 	_music_last_direction = step["direction"]
 	_music_last_was_leap = step["was_leap"]
 	_music_last_used_zigzag = step["used_zigzag"]
@@ -1979,26 +2235,64 @@ func _music_arch_direction() -> int:
 # to a resolution degree (tonic/third/fifth, weighted by tonal-hierarchy
 # tier - see _pick_resolution_degree()) on the last note of every
 # MUSIC_PHRASE_BARS-th bar, so phrases have a clear landing point.
-func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
+func _generate_music_bar_melody(pulse_count: int, accented_pulse_index: int = 0) -> Array[int]:
 	if pulse_count <= 0:
 		return []
 	var scale: Dictionary = GameData.SCALES[current_scale_index]
+	var style := _active_music_style()
 	var is_narrow: bool = MUSIC_NARROW_LEAP_SCALES.has(scale["id"])
-	var max_leap := MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP
+	var max_leap_override = style.get("max_leap_override")
+	var max_leap: int = max_leap_override if max_leap_override != null else (MUSIC_NARROW_MAX_LEAP if is_narrow else MUSIC_PENTATONIC_MAX_LEAP)
 	var degrees: Array[int] = []
 	# Parallel to `degrees` - which idiom (if any) put this specific note
 	# where it is, for the Tune panel's live event log/contour strip. Pure
 	# bookkeeping, never affects note choice. See
 	# docs/music-mode.md#visualizing-the-idioms.
 	var tags: Array[String] = []
+	# Call-and-response phrase structuring (Junkanoo's "call_response" -
+	# see GameData.MUSIC_STYLES): a phrase's first half (bars 0-1) is the
+	# "call" - generated normally, cached note-by-note into
+	# _music_call_phrase; the second half (bars 2-3) is the "response" -
+	# echoed straight from that cache instead of walked, draining it in
+	# order across both response bars. Cleared at the start of every new
+	# phrase so a partially-drained cache never bleeds into the next one.
+	var phrase_position := _music_bar_index % MUSIC_PHRASE_BARS
+	var is_call_response: bool = style.get("phrase_structure", "arch") == "call_response"
+	var is_response_bar: bool = is_call_response and phrase_position >= MUSIC_PHRASE_BARS / 2
+	if is_call_response and phrase_position == 0:
+		_music_call_phrase.clear()
+	if is_response_bar:
+		for i in pulse_count:
+			var degree: int = _music_call_phrase.pop_front() if not _music_call_phrase.is_empty() else _music_current_degree
+			degrees.append(degree)
+			tags.append("response")
+			_music_current_degree = degree
+			_music_last_direction = 0
+			_music_repeat_streak = 1
+		_music_bar_index += 1
+		_music_last_bar_tags = tags
+		return degrees
 	# Canonical riff shape: only offered at the start of a phrase (mirrors
 	# how these are taught - fixed little patterns, not spliced into the
 	# middle of an improvised line). Expressed as offsets from wherever the
 	# walk currently sits, not hardcoded to degree 0, so it still works when
 	# a session opens on a non-tonic degree (see _music_reset_walk()).
 	var riff: Array = []
-	if _music_bar_index % MUSIC_PHRASE_BARS == 0 and randf() < _music_idiom_value("riff_shapes"):
-		riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
+	# groove_lock styles (Junkanoo - see GameData.MUSIC_STYLES) force the
+	# riff to seed every phrase, always the *same* shape, rather than
+	# rolling against the idiom slider and re-picking randomly - so the
+	# melody riff stays locked alongside the rhythm ostinato, matching a
+	# real cowbell/horn-riff pattern that doesn't change mid-piece. A data
+	# range can express "usually," not "always, and always the same one,"
+	# so this needs the explicit branch.
+	var riff_locked: bool = style.get("groove_lock", false)
+	if phrase_position == 0 and (riff_locked or randf() < _music_idiom_value("riff_shapes")):
+		if riff_locked:
+			if _music_locked_riff_shape_index < 0:
+				_music_locked_riff_shape_index = randi() % MUSIC_RIFF_SHAPES.size()
+			riff = MUSIC_RIFF_SHAPES[_music_locked_riff_shape_index]
+		else:
+			riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
 	var riff_base := _music_current_degree
 	# Whether the *previous* note's direction pick actually leaned on
 	# zigzag_bias (SequenceGenerator.walk_next_step()'s "used_zigzag") - if
@@ -2014,22 +2308,33 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 			_music_last_direction = 0
 			_music_repeat_streak = 1
 			pending_zigzag = false
+			if is_call_response:
+				_music_call_phrase.append(riff_degree)
 			continue
 		var degree := _music_current_degree
 		var tag := ""
-		# Chord tones on strong beats (see docs/music-mode.md#chord-tones-on-
-		# strong-beats): pulse 0 is always the bar's downbeat (the Euclidean
-		# generator always places an onset at step 0 - see
-		# _euclidean_rhythm()), so nudge it to the nearest chord tone when the
-		# walk happens to be sitting on a passing tone there, rather than
-		# leaving harmonic placement to chance. A nudge to the *nearest*
-		# chord tone, not a jump to a weighted-random one like anchor-return -
-		# this is meant to read as "the walk's current position resolved
-		# slightly," not a deliberate drone return.
-		if i == 0 and not _is_resolution_degree(degree, scale) and randf() < MUSIC_STRONG_BEAT_CHORD_TONE_CHANCE:
+		# Chord tones on the style's accented pulse (see docs/music-mode.md#
+		# chord-tones-on-strong-beats): downbeat by default, or the offbeat
+		# pulse a style like Reggae accents instead (see
+		# _music_accent_step_index()) - nudge it to the nearest chord tone
+		# when the walk happens to be sitting on a passing tone there, rather
+		# than leaving harmonic placement to chance. A nudge to the
+		# *nearest* chord tone, not a jump to a weighted-random one like
+		# anchor-return - this is meant to read as "the walk's current
+		# position resolved slightly," not a deliberate drone return.
+		if i == accented_pulse_index and not _is_resolution_degree(degree, scale) and randf() < MUSIC_STRONG_BEAT_CHORD_TONE_CHANCE:
 			degree = _nearest_chord_tone_degree(degree, scale)
 			_music_current_degree = degree
 			tag = "chord"
+		# Chord-tone bias (see GameData.MUSIC_STYLES) - the same nudge as
+		# above, but a per-style chance evaluated on *every* note rather than
+		# only the accented one. This is what makes Reggae's bass-led melody
+		# lean on chord tones almost constantly, not just on the beat.
+		if not _is_resolution_degree(degree, scale) and randf() < style.get("chord_tone_nudge_chance", 0.0):
+			degree = _nearest_chord_tone_degree(degree, scale)
+			_music_current_degree = degree
+			if tag == "":
+				tag = "chord"
 		if not _is_resolution_degree(degree, scale) and randf() < _music_idiom_value("anchor_return"):
 			# Ghost return to a tonal-hierarchy-weighted tonic/third/fifth,
 			# same reset the phrase-end resolution below does - so the walk
@@ -2046,6 +2351,8 @@ func _generate_music_bar_melody(pulse_count: int) -> Array[int]:
 		pending_zigzag = false
 		degrees.append(degree)
 		tags.append(tag)
+		if is_call_response:
+			_music_call_phrase.append(degree)
 		var delta := _music_next_delta(max_leap)
 		pending_zigzag = _music_last_used_zigzag
 		var raw_target := degree + delta
@@ -2294,6 +2601,8 @@ func _music_loop() -> void:
 			await _music_glissando_sweep(step_duration)
 			if not music_mode:
 				return
+		var style := _active_music_style()
+		var groove_locked: bool = style.get("groove_lock", false)
 		var rhythm: Array[bool]
 		var is_groove_bar := false
 		if _music_groove_bars_left > 0:
@@ -2302,14 +2611,16 @@ func _music_loop() -> void:
 			is_groove_bar = true
 		else:
 			rhythm = _generate_music_rhythm()
-			if randf() < _music_idiom_value("groove_repeats"):
+			if groove_locked or randf() < _music_idiom_value("groove_repeats"):
 				_music_groove_rhythm = rhythm
-				_music_groove_bars_left = MUSIC_GROOVE_HOLD_BARS
+				_music_groove_bars_left = MUSIC_GROOVE_HOLD_BARS_LOCKED if groove_locked else MUSIC_GROOVE_HOLD_BARS
 		var pulse_count := 0
 		for on in rhythm:
 			if on:
 				pulse_count += 1
-		var melody := _generate_music_bar_melody(pulse_count)
+		var accented_step := _music_accent_step_index(rhythm)
+		var accented_pulse_index := _music_pulse_index_for_step(rhythm, accented_step)
+		var melody := _generate_music_bar_melody(pulse_count, accented_pulse_index)
 		var note_i := 0
 		for step_index in rhythm.size():
 			if not music_mode:
@@ -2322,9 +2633,9 @@ func _music_loop() -> void:
 				_music_log_degree(degree)
 				_music_viz_push(degree, note_tag, is_groove_bar)
 				_music_last_played_degree = degree
-				var is_downbeat := step_index == 0
-				var decay := MUSIC_ACCENT_DECAY if is_downbeat else MUSIC_DECAY_RATE
-				var volume := MUSIC_ACCENT_VOLUME if is_downbeat else MUSIC_VOLUME
+				var is_accented := step_index == accented_step
+				var decay := MUSIC_ACCENT_DECAY if is_accented else MUSIC_DECAY_RATE
+				var volume := MUSIC_ACCENT_VOLUME if is_accented else MUSIC_VOLUME
 				if pad:
 					await pad.flash(flash_duration, decay, volume)
 					last_played_pad = pad
@@ -2362,6 +2673,13 @@ func _on_start_pressed(mode: String) -> void:
 	chaos_mode = mode == "chaos"
 	duet_mode = mode == "duet"
 	duet_round = 0
+	# Roll a random Style (see GameData.MUSIC_STYLES) for this run - purely a
+	# generation-flavor layer, independent of and never touching scale
+	# selection (still whatever the player has chosen/unlocked in Settings).
+	# Rolled fresh every run start regardless of what Music Mode's own
+	# picker last had selected, so Music Mode's session-only style choice
+	# can never leak into a Normal/Chaos/Duet run.
+	_run_current_style = GameData.MUSIC_STYLES[randi() % GameData.MUSIC_STYLES.size()]
 	if duet_mode:
 		_music_reset_walk()
 	elif not chaos_mode:
@@ -2763,8 +3081,24 @@ func _normal_reset_walk() -> void:
 # NORMAL_ZIGZAG_BIAS instead of the player-tunable Music Mode slider - see
 # the NORMAL_ANCHOR_RETURN_CHANCE comment above), but keeps its own state so
 # the three modes' walks can't interfere with each other.
+# Normal/Chaos/Duet have no Tune-panel sliders, so the ported idioms
+# (anchor return, zigzag, riff shapes) normally run at a fixed tuned
+# constant rather than a player-adjustable range. The run's rolled Style
+# (see GameData.MUSIC_STYLES) can still flavor them: if the style defines
+# an idiom_overrides entry for this key, its "default" value is used in
+# place of the fixed constant - the same per-style intent that shapes Music
+# Mode's sliders, applied here without needing slider machinery that
+# doesn't exist in these modes.
+func _normal_idiom_default(key: String, fallback: float) -> float:
+	var overrides: Dictionary = _run_current_style.get("idiom_overrides", {})
+	if overrides.has(key):
+		return overrides[key].get("default", fallback)
+	return fallback
+
 func _normal_next_delta(max_leap: int) -> int:
-	var step := _walk_next_step(max_leap, _normal_repeat_streak, _normal_last_direction, _normal_last_was_leap, _normal_current_degree, NORMAL_ZIGZAG_BIAS, _normal_arch_direction())
+	var arch_bias := MUSIC_ARCH_BIAS_FLAT if _run_current_style.get("phrase_structure", "arch") == "flat_arch" else MUSIC_ARCH_BIAS
+	var zigzag_bias := _normal_idiom_default("zigzag_bias", NORMAL_ZIGZAG_BIAS)
+	var step := _walk_next_step(max_leap, _normal_repeat_streak, _normal_last_direction, _normal_last_was_leap, _normal_current_degree, zigzag_bias, _normal_arch_direction(), arch_bias)
 	_normal_last_direction = step["direction"]
 	_normal_last_was_leap = step["was_leap"]
 	return step["delta"]
@@ -2781,7 +3115,7 @@ func _normal_next_pad_name() -> String:
 	# Riff shape seeding, phrase start only (mirrors _generate_music_bar_melody
 	# but one note at a time, since Normal's sequence grows one note per
 	# call) - state spans multiple calls via _normal_riff/_normal_riff_index.
-	if _normal_riff.is_empty() and sequence.size() % NORMAL_PHRASE_LENGTH == 0 and randf() < NORMAL_RIFF_CHANCE:
+	if _normal_riff.is_empty() and sequence.size() % NORMAL_PHRASE_LENGTH == 0 and randf() < _normal_idiom_default("riff_shapes", NORMAL_RIFF_CHANCE):
 		_normal_riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
 		_normal_riff_index = 0
 		_normal_riff_base = _normal_current_degree
@@ -2796,7 +3130,7 @@ func _normal_next_pad_name() -> String:
 		_normal_repeat_streak = 1
 	else:
 		degree = _normal_current_degree
-		if not _is_resolution_degree(degree, scale) and randf() < NORMAL_ANCHOR_RETURN_CHANCE:
+		if not _is_resolution_degree(degree, scale) and randf() < _normal_idiom_default("anchor_return", NORMAL_ANCHOR_RETURN_CHANCE):
 			# Ghost return to a tonal-hierarchy-weighted tonic/third/fifth,
 			# same technique as Music Mode's anchor return - see
 			# _pick_resolution_degree() for why not always degree 0

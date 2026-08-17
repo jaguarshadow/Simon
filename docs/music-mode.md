@@ -469,3 +469,131 @@ biased.
 Not ported to Normal/Chaos Mode: that mode has no rhythm grid at all (every note is one
 memorize-and-repeat beat, not a position within a bar), so there's no meaningful "strong beat" to
 key this off - same reasoning as why groove repetition and glissando didn't port earlier.
+
+## Style presets
+
+Everything above produces one sound - a blend of handpan playing idioms layered on Western
+tonal-hierarchy theory (Krumhansl-Kessler resolution weighting, Huron's melodic arch), never
+labeled as such because there was only ever the one option. **Style** presets
+(`GameData.MUSIC_STYLES` in `scripts/game_data.gd`) name that default ("Western") and add six
+more, each a reparametrization of the same generator for a different real-world melodic idiom -
+no new instruments, no per-style special-case code.
+
+### Design principle: no style-specific exceptions
+
+Every style shares the exact same field shape (`accent_mode`, `resolution_mode`,
+`resolution_secondary_weight`, `chord_tone_nudge_chance`, `rhythm_pulses_min/max`,
+`idiom_overrides`, `max_leap_override`, `phrase_structure`, `groove_lock`). Styles differ only in
+which *values* they pick for these shared fields - never in which fields they have access to.
+
+This was a real correction, not a design that arrived this way from the start. An early draft of
+the Chinese style needed a unique `resolution_mode: "reroot"` (re-interpreting an existing
+pentatonic scale's degree as the tonic at runtime) plus a `requires_pentatonic` guard nothing else
+needed - flagged and rejected specifically because it broke the uniform-shape rule, and the
+Chinese style was dropped entirely rather than reworked to fit. The practical payoff of keeping
+every style scale-agnostic: **Music Mode lets the player pick any scale and any style
+independently** (17 scales × 7 styles, no locked pairings) - a style that needed to know something
+special about which scale was loaded couldn't support that.
+
+### The seven styles
+
+- **Western (default)** - today's baseline behavior, unchanged, just given an explicit name.
+- **Reggae (Jamaica)** - born late-1960s out of ska/rocksteady; the "one drop," where the downbeat
+  is deliberately left empty and the offbeat gets the accent instead, plus a bass-led melody that
+  leans hard on chord tones. Pairs with the new D Dorian scale.
+- **Junkanoo (Bahamas)** - West African-rooted street-parade drumming, the sound of Nassau's
+  Junkanoo carnival; dense polyrhythm, a locked repeating rhythm+riff ostinato, and
+  call-and-response horn riffs. Downbeat-accented (unlike Reggae) - it drives *on* the beat rather
+  than syncopating off it.
+- **Middle Eastern** - an approximation of maqam-based music (Arab world/Turkey/Persia). Real
+  maqam needs quarter-tones this equal-tempered game can't reproduce, so this borrows the ornament
+  vocabulary instead - heavy glissando (standing in for melisma/trills) and a loose, low
+  chord-tone pull rather than tidy resolution. Pairs with the new Hijaz scale.
+- **Balkan/Gypsy** - Klezmer, Balkan brass-band, and Gypsy-jazz; fast and riff-driven. Pairs with
+  the new Hungarian Minor scale.
+- **Japanese/Eastern** - gagaku/shakuhachi tradition; spacious and unhurried (*ma*, the deliberate
+  use of silence), narrow stepwise motion, and resolves to the 4th/octave rather than the Western
+  3rd/5th (Koizumi's nuclear-tone theory). Pairs with the new Insen scale or the existing Akebono
+  scales.
+- **Jazz** - wide, unpredictable melodic leaps and chord-tone-targeting ("enclosure," approximated
+  - true swing-eighth timing and the real two-note chromatic lead-in aren't implemented yet).
+  Pairs with the new Whole Tone scale.
+
+Sources: [One-drop rhythm](https://en.wikipedia.org/wiki/One_drop_rhythm),
+[Music of the Bahamas](https://en.wikipedia.org/wiki/Music_of_the_Bahamas),
+[maqamworld.com](https://www.maqamworld.com/en/maqam.php),
+[Hungarian Minor scale](https://yonamariemusic.com/yona/blog/299/all-about-the-hungarian-minor-scale),
+[Japanese musical scales](https://en.wikipedia.org/wiki/Japanese_musical_scales),
+[Jazzadvice - Approach Notes & Enclosures](https://www.jazzadvice.com/5-easy-tricks-with-approach-notes-in-jazz-improvisation/).
+
+### New idioms this required
+
+- **Offbeat accent** - `_music_is_accented_step()` generalizes the old hardcoded "step 0 is always
+  the accent" into a lookup on `style.accent_mode`. `"downbeat"` is unchanged; `"offbeat"` (Reggae)
+  accents whichever onset sits closest to 16-step position 12 (beat 3 of 4, the one-drop
+  placement), excluding step 0, falling back to the first onset found if a sparse pattern has none
+  near there.
+- **Chord-tone bias** - the existing strong-beat chord-tone nudge (see [Chord tones on strong
+  beats](#chord-tones-on-strong-beats) above) generalized two ways: it now checks whichever pulse
+  is *actually* accented (via the offbeat-accent lookup above) rather than hardcoded pulse 0, and a
+  second, independent per-style `chord_tone_nudge_chance` rolls on *every* note, not just the
+  accented one - this is what makes Reggae's melody read as bass-led rather than scalar.
+- **Call-and-response phrasing** - `phrase_structure: "call_response"` (Junkanoo). A phrase's first
+  half (bars 0-1, the "call") generates and plays normally while its degree sequence is cached
+  into `_music_call_phrase`; the second half (bars 2-3, the "response") drains that cache in order
+  instead of walking, so the response is a direct echo of the call. v1 scope is exact echo, no
+  transposition/variation - matches the existing `MUSIC_RIFF_SHAPES` precedent of canonical fixed
+  shapes rather than generated variation.
+- **4th/octave resolution** - `resolution_mode: "fourth_octave"` (Japanese/Eastern) is a second
+  branch in `SequenceGenerator.scale_degree_weight()` alongside the original `"triad"` tiering: the
+  secondary tonal-hierarchy tier keys off 5 semitones (perfect 4th) from the tonic instead of 3/4/7
+  (3rd/5th). Both modes are computed the same way, generically, from the scale's own tuned
+  frequencies - no scale-type branch, so it works on any scale, including ones with no degree that
+  qualifies (resolution then falls back to the tonic tier alone, the same fallback that already
+  existed).
+
+### `resolution_secondary_weight`: one knob for two opposite-sounding effects
+
+`SequenceGenerator.scale_degree_weight()`'s secondary tier (3rd/5th under `"triad"` mode, 4th under
+`"fourth_octave"`) used to be a fixed constant (`MUSIC_DEGREE_WEIGHT_TRIAD = 1.5`). Each style can
+now override it via `resolution_secondary_weight`. Raising it toward the tonic weight
+(`MUSIC_DEGREE_WEIGHT_TONIC = 2.4`) produces a *stronger* pull - Reggae's bassline-like insistence
+on chord tones. Lowering it produces a *weaker*, looser pull - Middle Eastern's less-resolved
+wandering. Same one mechanism, just tuned in opposite directions per style, rather than two
+separate features.
+
+### Where a style is "live": Music Mode vs. Normal/Chaos/Duet
+
+`_active_music_style()` is the single accessor every idiom/resolution/rhythm call site goes
+through: `_music_current_style` (Music Mode's own player-picked style, from the new Style panel -
+see below) while `music_mode` is true, otherwise `_run_current_style` (rolled once at the start of
+every Normal/Chaos/Duet run via `GameData.MUSIC_STYLES[randi() % ...]`, in `_on_start_pressed()`).
+Two separate fields, not one shared "current style," so Music Mode's picker can never leak into a
+Normal/Chaos/Duet run and vice versa.
+
+Deliberately **not** symmetric with scale selection: Music Mode lets the player choose scale and
+style freely; Normal/Chaos/Duet roll a random style but leave scale exactly as it already worked
+(the player's Settings choice, persisted, unlock-rewarded). Scale determines the physical ring
+layout a player has practiced for a memory game - auto-randomizing it every run would fight the
+actual skill mechanic and would need redesigning the existing scale-unlock reward loop for no
+clear benefit, since style (a generation-flavor layer) doesn't carry that cost. This puts style in
+the same category as the idioms already ported to these modes (anchor return, zigzag, riff shapes,
+arch) - a run-flavoring detail underneath, not a player-facing choice with its own progression
+track. Since Normal/Chaos/Duet have no Tune-panel sliders, a style's `idiom_overrides` still
+reaches their ported idioms via `_normal_idiom_default()`: if the rolled style defines an override
+for a key, its `"default"` value substitutes for the mode's normal fixed constant
+(`NORMAL_ANCHOR_RETURN_CHANCE` etc.) - reusing each style's tuning intent without needing slider
+machinery that doesn't exist in these modes.
+
+Styles carry no `unlock` key (free/always available from the start) and Music Mode's choice is
+session-only, resetting to Western on every fresh entry - same precedent as the Tune panel
+sliders' "session-only tuning, not a persistent preference."
+
+### Music Style panel
+
+A new card-grid picker (`_build_music_style_panel()`/`_build_style_cards()` in `Main.gd`), reached
+via a `Style` button next to Tune/Exit on `MusicBar`. Built entirely in code rather than
+hand-authored in the .tscn - same reasoning as `_build_scale_cards()`: a handful of near-identical
+cards generated from `GameData.MUSIC_STYLES` is far less error-prone than hand-placing them. A
+sibling of `MusicTunePanel`, not nested inside it, so the Tune panel's existing layout is
+untouched. No unlock chrome on any card, since styles carry no `unlock` key.

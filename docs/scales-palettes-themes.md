@@ -33,9 +33,9 @@ curated look per theme, at the cost of losing free recombination. `GameData.PALE
 standalone array (used by the legacy/flat palette rendering path), but the *player-facing*
 picker is themes-only.
 
-## Scales are sourced from the real Hapi Drum product line
+## Scales are sourced from the real Hapi Drum product line (plus 6 further-afield additions)
 
-All 11 scales' note/frequency data is sourced from [Hapi Drum's own scale page](https://hapidrum.co/hapi-drum-scale.aspx)
+The original 11 scales' note/frequency data is sourced from [Hapi Drum's own scale page](https://hapidrum.co/hapi-drum-scale.aspx)
 where an equivalent exists, since this is a steel-tongue-drum game and Hapi is a real
 manufacturer of the instrument - authenticity matters more than an arbitrary made-up tuning
 would. Scale/frequency data is factual (equal-tempered pitch values, traditional scale patterns
@@ -48,30 +48,57 @@ Pentatonic, A Akebono Pentatonic, E Major Pentatonic) were added as further unlo
 tiers (Round 25 / Score 3000 / Combo 25) beyond the existing milestones, rather than as free
 defaults, to extend the existing curve instead of flattening it.
 
-Each new/corrected scale's `ring_order` was recomputed with the same brute-force
-dissonance-minimization method described in `TODO.md` (score every adjacent degree pair by
-interval-class dissonance - unison lowest, tritone highest - and search all 5040 rotations fixing
-degree 0 at ring position 0). Scales whose interval *pattern* didn't change (C Major Pentatonic
-was only transposed up an octave) keep their existing `ring_order`, since dissonance between
-scale degrees is transposition-invariant.
+A second wave of 6 scales was added alongside Music Mode's Style presets (see
+[music-mode.md](music-mode.md#style-presets) for the full research writeup) - these reach beyond
+Hapi's product line into other real, documented scales/modes, since the styles they pair well
+with (Reggae, Middle Eastern, Balkan/Gypsy, Japanese/Eastern, jazz/impressionist) needed tunings
+Hapi doesn't offer. Same policy as before - real, sourced scales, not invented ones:
 
-## `ring_order`: visual position vs. scale degree
+| id | Name | Sourced from |
+|---|---|---|
+| `d_dorian` | D Dorian | Derived from `d_minor` (natural minor's flat 6th swapped for Dorian's natural 6th) |
+| `blues_hexatonic` | A Blues | Minor pentatonic + the "blue" flat-5, the standard blues hexatonic |
+| `d_hijaz` | D Hijaz | Middle Eastern/Arabic maqam family; also a real, common handpan scale name |
+| `hungarian_minor` | E Hungarian Minor | Balkan/Klezmer/Gypsy-jazz tradition |
+| `insen` | C Insen | Japanese shakuhachi tradition |
+| `whole_tone` | C Whole Tone | Impressionist (Debussy) / jazz-over-augmented-chord |
+
+Unlock thresholds continue the existing round/score/combo curve rather than starting a new one.
+
+## `ring_order`: the physical zigzag layout, one fixed pattern for every scale
 
 Each scale entry has a `tones` array (frequencies, index = scale degree 0-7) and a `ring_order`
-array (which degree sits at which *visual ring position*, e.g. `[0, 2, 7, 4, 1, 6, 3, 5]`).
-`_apply_scale_and_palette()` uses it as:
+array (which degree sits at which *visual ring position*). `_apply_scale_and_palette()` uses it
+as:
 
 ```gdscript
 var degree: int = ring_order[i]          # ring slot i holds this scale degree
 pad.tone_freq = scale["tones"][degree]
 ```
 
-Degrees aren't placed around the ring in ascending order (`0,1,2,...`) because that would put
-adjacent scale steps next to each other physically, which makes accidental adjacent-pad mistakes
-sound like *near-misses* (a half-step off) rather than clearly wrong notes — worse for a memory
-game where the player should be able to tell "close in scale" apart from "close on the ring" by
-ear. Scrambling degree-to-position (while keeping each scale's `ring_order` fixed per scale, not
-random per session) keeps that physical/tonal separation consistent and learnable.
+**This used to be computed per scale** via a brute-force dissonance-minimization search (score
+every adjacent degree pair by interval-class dissonance, search all 5040 rotations fixing degree
+0 at ring position 0, keep the lowest-scoring arrangement) - the reasoning being that ascending
+scale-degrees shouldn't sit physically adjacent, so an accidental miss on a neighboring pad reads
+as clearly wrong rather than a near-miss a half-step off.
+
+Researching how real handpans/steel tongue drums are actually laid out (Hapi Drum's own site,
+handpan builder guides - see [music-mode.md](music-mode.md#style-presets) sources) found they use
+a **fixed, scale-independent** pattern: tone fields are numbered in ascending pitch order but
+placed physically alternating sides of the ring as you go - the "zipper"/zigzag layout, the same
+structural pattern regardless of which scale/tuning is on the instrument. That's now
+`GameData.HANDPAN_RING_ORDER := [0, 2, 4, 6, 7, 5, 3, 1]`, walking clockwise from the tonic,
+shared by every scale entry (`ring_order` in each `SCALES` dict just points at this one constant
+array rather than holding its own computed permutation - safe to share since nothing in
+`Main.gd`/`sequence_generator.gd` ever mutates a `ring_order` array, only reads/searches it).
+
+This is a genuine behavior change from the old per-scale computation, not just a naming cleanup -
+switching to it changed the physical pad layout on scales that had already shipped, not only the
+6 new ones. It turns out not to sacrifice the original goal, though: the zigzag naturally keeps
+physical ring-neighbors 2 scale-degrees apart, so an accidental miss still reads as clearly wrong
+rather than a near-miss - except at exactly one seam, where the pattern wraps back to the tonic
+(ring positions 7→0, scale degrees 1→0, which *are* a step apart). Real handpans have that same
+seam; it isn't a regression introduced by simplifying to one shared pattern.
 
 This same `ring_order` is what Music Mode uses in reverse (`ring_order.find(degree)`) to find
 which physical pad to light for a given scale-degree note — see
@@ -79,8 +106,9 @@ which physical pad to light for a given scale-degree note — see
 
 ## Non-pentatonic scales get special handling in Music Mode
 
-Six of the eight scales are pentatonic, which — per the reasoning in `music-mode.md` — guarantees
-no dissonant combination of scale degrees. The other two (`d_minor`, `c_major_diatonic`) plus
-`chromatic_run` contain half-steps/tritones and get a smaller max melodic leap in Music Mode's
-random walk (`MUSIC_NARROW_LEAP_SCALES` in `Main.gd`) as a cheap mitigation, rather than building
-a full harmonic-dissonance model for three scales.
+Scales that contain a half-step or tritone get a smaller max melodic leap in Music Mode's random
+walk (`MUSIC_NARROW_LEAP_SCALES` in `Main.gd`: `d_minor`, `c_major_diatonic`, `chromatic_run`,
+plus `d_dorian`, `d_hijaz`, `hungarian_minor`, and `whole_tone` from the second scale wave) as a
+cheap mitigation, rather than building a full harmonic-dissonance model. The rest (the original
+pentatonic/Akebono scales, plus `blues_hexatonic`/`insen` from the second wave) are treated as
+dissonance-safe by the same reasoning `music-mode.md` documents for the original pentatonic set.
