@@ -142,32 +142,58 @@ const MUSIC_STYLES := [
 		"rhythm_pulses_min": 5, "rhythm_pulses_max": 9,
 		"max_leap_override": null, "flat_arch": false},
 	{"id": "reggae", "name": "Reggae\n(Jamaica)",
-		"idiom_preset": {"offbeat_accent": 0.85, "chord_tone_bias": 0.75, "call_response": 0.0, "fourth_octave": 0.0, "groove_repeats": 0.8},
+		# call_response 0.28: real and "integral" per sources, but secondary to
+		# the one-drop groove itself - horn/vocal answer phrases happen
+		# periodically, not on every phrase the way Junkanoo's do.
+		"idiom_preset": {"offbeat_accent": 0.9, "chord_tone_bias": 0.75, "call_response": 0.28, "fourth_octave": 0.0, "groove_repeats": 0.85},
 		"resolution_secondary_weight": 2.1,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 6,
 		"max_leap_override": null, "flat_arch": false},
 	{"id": "junkanoo", "name": "Junkanoo\n(Bahamas)",
-		"idiom_preset": {"offbeat_accent": 0.1, "chord_tone_bias": 0.4, "call_response": 0.9, "fourth_octave": 0.0, "groove_repeats": 0.95, "riff_shapes": 0.9},
+		"idiom_preset": {"offbeat_accent": 0.1, "chord_tone_bias": 0.4, "call_response": 0.85, "fourth_octave": 0.0, "groove_repeats": 0.95, "riff_shapes": 0.9},
 		"resolution_secondary_weight": 1.6,
 		"rhythm_pulses_min": 11, "rhythm_pulses_max": 13,
 		"max_leap_override": null, "flat_arch": false},
 	{"id": "middle_eastern", "name": "Middle\nEastern",
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.0, "fourth_octave": 0.0, "glissando": 0.85, "ghost_notes": 0.8},
+		# call_response 0.12: weak/metaphorical at best - istikhbar is
+		# described as the performer "eliciting" a response from the maqam
+		# itself, a solo internal dialogue, not literally alternating voices.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.12, "fourth_octave": 0.0, "glissando": 0.85, "ghost_notes": 0.8},
 		"resolution_secondary_weight": 0.9,
 		"rhythm_pulses_min": 4, "rhythm_pulses_max": 8,
 		"max_leap_override": null, "flat_arch": false},
 	{"id": "balkan", "name": "Balkan /\nGypsy",
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.2, "call_response": 0.0, "fourth_octave": 0.0, "riff_shapes": 0.85, "zigzag_bias": 0.85},
+		# call_response 0.65: sources describe brass/accordion-violin
+		# call-and-response as "a fundamental characteristic" of Balkan brass
+		# - comparably central to this genre as it is to Junkanoo's.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.2, "call_response": 0.65, "fourth_octave": 0.0, "riff_shapes": 0.85, "zigzag_bias": 0.85},
 		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
 		"max_leap_override": null, "flat_arch": false},
 	{"id": "japanese", "name": "Japanese /\nEastern",
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.0, "fourth_octave": 0.9, "anchor_return": 0.15},
+		# call_response 0.12: min'yo folk song genuinely has call-and-response
+		# roots (work-song kakegoe shouts), but solo shakuhachi honkyoku -
+		# closer to what this style is actually modeled on - is genuinely
+		# solo, no response. Small nonzero acknowledges the folk-song side
+		# without contradicting the spacious-solo framing this style leans on.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.12, "fourth_octave": 0.9, "anchor_return": 0.15},
 		"resolution_secondary_weight": 1.9,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 5,
 		"max_leap_override": 2, "flat_arch": true},
 	{"id": "jazz", "name": "Jazz",
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.5, "call_response": 0.0, "fourth_octave": 0.0, "zigzag_bias": 0.95},
+		# chord_tone_bias raised: jazz pedagogy treats chord-tone targeting as
+		# foundational ("what separates melodic solos from random scale
+		# runs"), not occasional - this idiom was sitting at the same value
+		# as Western's baseline, which undersold it.
+		# call_response 0.55: trading fours and horn-section call-and-response
+		# are described as "fundamental" and "as old as jazz itself" - at
+		# least as central to jazz as to Junkanoo/Balkan.
+		# ghost_notes/riff_shapes raised modestly: ghost notes play a real
+		# structural/conversational role in jazz drumming specifically (not
+		# just incidental); licks are a standard, practiced part of the
+		# vocabulary ("5 to 10 memorized phrases... every now and then") -
+		# real but not dominant, hence a modest rather than large raise.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.65, "call_response": 0.55, "fourth_octave": 0.0, "zigzag_bias": 0.95, "ghost_notes": 0.6, "riff_shapes": 0.55},
 		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
 		"max_leap_override": null, "flat_arch": false},
