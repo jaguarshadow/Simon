@@ -395,15 +395,12 @@ const MUSIC_IDIOM_RANGES := {
 @onready var music_tune_button: Button = %TuneButton
 @onready var music_tune_panel: Control = $MusicTunePanel
 @onready var music_tune_close_button: Button = %MusicTuneCloseButton
-# Music Style panel (see GameData.MUSIC_STYLES) - built entirely in code from
-# _build_music_style_panel()/_build_style_cards(), same reasoning as
-# _build_scale_cards(): a handful of near-identical cards generated from data
-# is far less error-prone than hand-authoring them in the .tscn. A sibling of
-# MusicTunePanel, not nested inside it, so the Tune panel's existing
-# hand-built layout is untouched.
-var music_style_button: Button
-var music_style_panel: Control
-var music_style_close_button: Button
+# Style picker (see GameData.MUSIC_STYLES) - built entirely in code from
+# _build_style_picker_row()/_build_style_cards(), same reasoning as
+# _build_scale_cards(): a handful of near-identical cards generated from
+# data is far less error-prone than hand-authoring them in the .tscn. Lives
+# *inside* MusicTunePanel (not a separate modal) so picking a style and
+# watching/adjusting the sliders happen in one glance, not two panels.
 var music_style_grid: GridContainer
 var music_style_buttons: Array[Button] = []
 @onready var duet_button: Button = %DuetButton
@@ -715,7 +712,7 @@ func _ready() -> void:
 	cash_out_button.pressed.connect(_on_cash_out_button_pressed)
 	for i in modifier_buttons.size():
 		modifier_buttons[i].pressed.connect(_on_modifier_button_pressed.bind(i))
-	_build_music_style_panel()
+	_build_style_picker_row()
 	_build_extra_idiom_rows()
 	_build_scale_cards()
 	_build_palette_and_theme_buttons()
@@ -933,79 +930,35 @@ func _build_extra_idiom_rows() -> void:
 		music_idiom_sliders[key] = slider
 		music_idiom_pct_labels[key] = pct_label
 
-func _build_music_style_panel() -> void:
-	music_style_panel = Control.new()
-	music_style_panel.name = "MusicStylePanel"
-	music_style_panel.visible = false
-	music_style_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(music_style_panel)
+# Style picker lives *inside* the Tune panel (not a separate modal) - a
+# player picking a style needs to watch the sliders move and keep adjusting
+# from there in the same glance, not close one panel and reopen another to
+# compare. Spliced into the existing hand-authored VBoxContainer right after
+# its title, same way _build_extra_idiom_rows() splices in the four new
+# idiom rows before the close button.
+func _build_style_picker_row() -> void:
+	var vbox: VBoxContainer = music_tune_close_button.get_parent()
+	if vbox.get_child_count() > 0 and vbox.get_child(0) is Label:
+		(vbox.get_child(0) as Label).text = "Music Style & Tuning"
 
-	var dim := ColorRect.new()
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0, 0, 0, 0.72)
-	music_style_panel.add_child(dim)
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	music_style_panel.add_child(center)
-
-	var content := VBoxContainer.new()
-	content.custom_minimum_size = Vector2(460, 0)
-	content.add_theme_constant_override("separation", 12)
-	center.add_child(content)
-
-	var panel_bg := PanelContainer.new()
-	panel_bg.custom_minimum_size = Vector2(460, 0)
-	var panel_sb := StyleBoxFlat.new()
-	panel_sb.bg_color = Color(0.08, 0.09, 0.11, 0.98)
-	panel_sb.set_corner_radius_all(14)
-	panel_sb.set_border_width_all(1)
-	panel_sb.border_color = Color(1, 1, 1, 0.08)
-	panel_bg.add_theme_stylebox_override("panel", panel_sb)
-	content.add_child(panel_bg)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 22)
-	margin.add_theme_constant_override("margin_top", 20)
-	margin.add_theme_constant_override("margin_right", 22)
-	margin.add_theme_constant_override("margin_bottom", 20)
-	panel_bg.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
-
-	var title := Label.new()
-	title.text = "Music Style"
-	title.add_theme_font_size_override("font_size", 22)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	var subtitle := Label.new()
-	subtitle.text = "Reparametrizes rhythm, accent, and melodic resolution on top of whichever scale is loaded - pick any combination."
-	subtitle.add_theme_font_size_override("font_size", 12)
-	subtitle.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
-	subtitle.autowrap_mode = 2
-	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(subtitle)
+	var section_label := Label.new()
+	section_label.text = "Style (loads a preset into the sliders below - keep tuning from there)"
+	section_label.add_theme_font_size_override("font_size", 12)
+	section_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
+	section_label.autowrap_mode = 2
+	vbox.add_child(section_label)
+	vbox.move_child(section_label, 1)
 
 	music_style_grid = GridContainer.new()
-	music_style_grid.columns = 2
-	music_style_grid.add_theme_constant_override("h_separation", 10)
-	music_style_grid.add_theme_constant_override("v_separation", 10)
+	music_style_grid.columns = 4
+	music_style_grid.add_theme_constant_override("h_separation", 6)
+	music_style_grid.add_theme_constant_override("v_separation", 6)
 	vbox.add_child(music_style_grid)
+	vbox.move_child(music_style_grid, 2)
 
-	music_style_close_button = Button.new()
-	music_style_close_button.text = "Close"
-	music_style_close_button.focus_mode = Control.FOCUS_NONE
-	music_style_close_button.pressed.connect(_on_music_style_close_pressed)
-	vbox.add_child(music_style_close_button)
-
-	music_style_button = Button.new()
-	music_style_button.text = "Style"
-	music_style_button.focus_mode = Control.FOCUS_NONE
-	music_style_button.pressed.connect(_on_music_style_button_pressed)
-	music_bar.add_child(music_style_button)
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+	vbox.move_child(sep, 3)
 
 	_build_style_cards()
 
@@ -1013,33 +966,14 @@ func _build_style_cards() -> void:
 	for i in GameData.MUSIC_STYLES.size():
 		var style: Dictionary = GameData.MUSIC_STYLES[i]
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(210, 64)
+		card.custom_minimum_size = Vector2(100, 40)
 		card.focus_mode = Control.FOCUS_NONE
 		card.clip_contents = true
+		card.text = style["name"]
+		card.add_theme_font_size_override("font_size", 11)
 		card.pressed.connect(_on_style_button_pressed.bind(i))
 		music_style_grid.add_child(card)
 		music_style_buttons.append(card)
-
-		var margin := MarginContainer.new()
-		margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		margin.add_theme_constant_override("margin_left", 12)
-		margin.add_theme_constant_override("margin_right", 12)
-		margin.add_theme_constant_override("margin_top", 8)
-		margin.add_theme_constant_override("margin_bottom", 8)
-		card.add_child(margin)
-
-		var vbox := VBoxContainer.new()
-		vbox.add_theme_constant_override("separation", 4)
-		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		margin.add_child(vbox)
-
-		var name_label := Label.new()
-		name_label.text = style["name"]
-		name_label.add_theme_font_size_override("font_size", 14)
-		name_label.autowrap_mode = 2
-		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vbox.add_child(name_label)
 	_refresh_style_cards()
 
 # Highlights whichever card matches _music_current_style - called on card
@@ -1052,12 +986,6 @@ func _refresh_style_cards() -> void:
 	for i in music_style_buttons.size():
 		var active: bool = GameData.MUSIC_STYLES[i]["id"] == _music_current_style.get("id", "western")
 		_style_pick_card(music_style_buttons[i], active, false, accent, border, 10)
-
-func _on_music_style_button_pressed() -> void:
-	music_style_panel.visible = true
-
-func _on_music_style_close_pressed() -> void:
-	music_style_panel.visible = false
 
 # Scale and Style are picked fully independently in Music Mode (see
 # GameData.MUSIC_STYLES) - this never touches current_scale_index. Resets
