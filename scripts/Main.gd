@@ -739,6 +739,7 @@ func _ready() -> void:
 		modifier_buttons[i].pressed.connect(_on_modifier_button_pressed.bind(i))
 	_build_style_picker_row()
 	_build_extra_idiom_rows()
+	_wrap_tune_panel_content_in_scroll()
 	_build_scale_cards()
 	_build_palette_and_theme_buttons()
 	for i in palette_buttons.size():
@@ -952,6 +953,40 @@ func _build_extra_idiom_rows() -> void:
 		vbox.move_child(music_tune_close_button, vbox.get_child_count() - 1)
 		music_idiom_sliders[key] = slider
 		music_idiom_pct_labels[key] = pct_label
+
+# The Style picker (7 cards) plus twelve idiom sliders no longer fit on
+# screen as one un-scrolled column - on a typical viewport the panel simply
+# overflowed past the bottom, taking the close button with it (unreachable,
+# reported as "can't be closed"). Fixes it by moving everything *except* the
+# title and close button into a height-bounded ScrollContainer, so the
+# panel scrolls internally instead of growing past the viewport, while the
+# title and close button stay pinned and always reachable regardless of
+# scroll position. Must run after _build_style_picker_row()/
+# _build_extra_idiom_rows() have added their content, since it grabs
+# whatever is in the Tune panel's content VBoxContainer at the time it runs.
+func _wrap_tune_panel_content_in_scroll() -> void:
+	var inner_vbox: VBoxContainer = music_tune_close_button.get_parent()
+	var margin: Control = inner_vbox.get_parent()
+	var title: Node = inner_vbox.get_child(0)
+
+	inner_vbox.remove_child(title)
+	inner_vbox.remove_child(music_tune_close_button)
+	margin.remove_child(inner_vbox)
+
+	var outer_vbox := VBoxContainer.new()
+	outer_vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(outer_vbox)
+
+	outer_vbox.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 380)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer_vbox.add_child(scroll)
+	scroll.add_child(inner_vbox)
+
+	outer_vbox.add_child(music_tune_close_button)
 
 # Style picker lives *inside* the Tune panel (not a separate modal) - a
 # player picking a style needs to watch the sliders move and keep adjusting
