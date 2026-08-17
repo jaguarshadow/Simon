@@ -424,6 +424,20 @@ var music_style_buttons: Array[Button] = []
 # informational, never restricts which scale a player can actually load
 # alongside a style (see _refresh_style_cards()).
 var music_style_hint_labels: Array[Label] = []
+# Music Mode's own scale picker (see _build_music_scale_panel()) - a
+# separate button/panel from the Settings scale grid, so changing scale
+# while listening doesn't mean leaving Music Mode's own UI to open Settings
+# (which also drags in palette/theme/best-stats content that's irrelevant
+# here). Reuses the same card-building helpers as Settings' scale grid
+# (_make_pick_badge/_style_pick_badge/_style_pick_card) so unlock state
+# renders identically, just a second, Music-Mode-scoped set of card nodes.
+var music_scale_button: Button
+var music_scale_panel: Control
+var music_scale_close_button: Button
+var music_scale_grid: GridContainer
+var music_scale_buttons: Array[Button] = []
+var music_scale_badges: Array[PanelContainer] = []
+var music_scale_unlock_labels: Array[Label] = []
 @onready var duet_button: Button = %DuetButton
 # Idiom visualizer (see docs/music-mode.md#visualizing-the-idioms) - a
 # scrolling degree-over-time contour strip plus a fading event log, so a
@@ -737,6 +751,7 @@ func _ready() -> void:
 	cash_out_button.pressed.connect(_on_cash_out_button_pressed)
 	for i in modifier_buttons.size():
 		modifier_buttons[i].pressed.connect(_on_modifier_button_pressed.bind(i))
+	_build_music_scale_panel()
 	_build_style_picker_row()
 	_build_extra_idiom_rows()
 	_wrap_tune_panel_content_in_scroll()
@@ -987,6 +1002,179 @@ func _wrap_tune_panel_content_in_scroll() -> void:
 	scroll.add_child(inner_vbox)
 
 	outer_vbox.add_child(music_tune_close_button)
+
+# Music Mode's own scale picker - deliberately a *separate* button/panel
+# from the Style/Tune panel (unlike Style, which got folded into Tune
+# because picking a style needs to be watched against the sliders in real
+# time - see _build_style_picker_row()). Scale and Style are independent
+# axes by design (Music Mode already lets the player pair any of the 17
+# scales with any of the 7 styles freely), so there's no "watch it move
+# something else" argument for merging them - the only goal here is
+# avoiding a trip to the full Settings panel (which also drags in
+# palette/theme/best-stats content that's irrelevant mid-listening) just to
+# change scale. Built in code, same reasoning as every other Music Mode
+# panel this session: fewer error-prone hand-authored .tscn nodes.
+func _build_music_scale_panel() -> void:
+	music_scale_button = Button.new()
+	music_scale_button.text = "Scale"
+	music_scale_button.focus_mode = Control.FOCUS_NONE
+	music_scale_button.position = Vector2(320, 40)
+	music_scale_button.size = Vector2(80, 36)
+	music_scale_button.pressed.connect(_on_music_scale_button_pressed)
+	music_bar.add_child(music_scale_button)
+
+	music_scale_panel = Control.new()
+	music_scale_panel.name = "MusicScalePanel"
+	music_scale_panel.visible = false
+	music_scale_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(music_scale_panel)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.72)
+	music_scale_panel.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	music_scale_panel.add_child(center)
+
+	var content := VBoxContainer.new()
+	content.custom_minimum_size = Vector2(460, 0)
+	content.add_theme_constant_override("separation", 12)
+	center.add_child(content)
+
+	var panel_bg := PanelContainer.new()
+	panel_bg.custom_minimum_size = Vector2(460, 0)
+	var panel_sb := StyleBoxFlat.new()
+	panel_sb.bg_color = Color(0.08, 0.09, 0.11, 0.98)
+	panel_sb.set_corner_radius_all(14)
+	panel_sb.set_border_width_all(1)
+	panel_sb.border_color = Color(1, 1, 1, 0.08)
+	panel_bg.add_theme_stylebox_override("panel", panel_sb)
+	content.add_child(panel_bg)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 22)
+	margin.add_theme_constant_override("margin_top", 20)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_bottom", 20)
+	panel_bg.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "Music Scale"
+	title.add_theme_font_size_override("font_size", 22)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(0, 380)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(scroll)
+
+	music_scale_grid = GridContainer.new()
+	music_scale_grid.columns = 2
+	music_scale_grid.add_theme_constant_override("h_separation", 10)
+	music_scale_grid.add_theme_constant_override("v_separation", 10)
+	scroll.add_child(music_scale_grid)
+
+	music_scale_close_button = Button.new()
+	music_scale_close_button.text = "Close"
+	music_scale_close_button.focus_mode = Control.FOCUS_NONE
+	music_scale_close_button.pressed.connect(_on_music_scale_close_pressed)
+	vbox.add_child(music_scale_close_button)
+
+	_build_music_scale_cards()
+
+func _build_music_scale_cards() -> void:
+	for i in GameData.SCALES.size():
+		var scale: Dictionary = GameData.SCALES[i]
+		var card := Button.new()
+		card.custom_minimum_size = Vector2(210, 64)
+		card.focus_mode = Control.FOCUS_NONE
+		card.clip_contents = true
+		card.pressed.connect(_on_music_scale_card_pressed.bind(i))
+		music_scale_grid.add_child(card)
+		music_scale_buttons.append(card)
+
+		var margin := MarginContainer.new()
+		margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_theme_constant_override("margin_left", 12)
+		margin.add_theme_constant_override("margin_right", 12)
+		margin.add_theme_constant_override("margin_top", 8)
+		margin.add_theme_constant_override("margin_bottom", 8)
+		card.add_child(margin)
+
+		var vbox := VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 4)
+		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		margin.add_child(vbox)
+
+		var header := HBoxContainer.new()
+		header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		vbox.add_child(header)
+
+		var name_label := Label.new()
+		name_label.text = scale["name"]
+		name_label.add_theme_font_size_override("font_size", 13)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.autowrap_mode = 2
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		header.add_child(name_label)
+
+		music_scale_badges.append(_make_pick_badge(header))
+
+		var unlock_label := Label.new()
+		unlock_label.add_theme_font_size_override("font_size", 10)
+		unlock_label.autowrap_mode = 2
+		unlock_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		unlock_label.visible = false
+		if scale.has("unlock"):
+			unlock_label.text = _requirement_text(scale["unlock"])
+		vbox.add_child(unlock_label)
+		music_scale_unlock_labels.append(unlock_label)
+	_refresh_music_scale_cards()
+
+# Highlights whichever card matches current_scale_index and shows/hides
+# each locked scale's unlock requirement - called on card press, whenever
+# _apply_scale_and_palette() runs (so an external scale change, e.g. from
+# Settings, stays in sync here too), and on Music Mode entry.
+func _refresh_music_scale_cards() -> void:
+	if music_scale_buttons.is_empty():
+		return
+	var accent: Color = GameData.THEMES[current_theme_index]["accent"]
+	var accent_text: Color = GameData.THEMES[current_theme_index].get("accent_text", Color.BLACK)
+	var border: Color = GameData.THEMES[current_theme_index]["border"]
+	for i in music_scale_buttons.size():
+		var unlocked := _is_unlocked(GameData.SCALES[i])
+		var active := unlocked and i == current_scale_index
+		music_scale_buttons[i].disabled = not unlocked
+		music_scale_unlock_labels[i].visible = not unlocked
+		_style_pick_badge(music_scale_badges[i], active, not unlocked, accent, accent_text)
+		_style_pick_card(music_scale_buttons[i], active, not unlocked, accent, border, 10)
+
+func _on_music_scale_button_pressed() -> void:
+	music_scale_panel.visible = true
+
+func _on_music_scale_close_pressed() -> void:
+	music_scale_panel.visible = false
+
+# Deliberately does NOT touch the Settings panel (unlike the Settings scale
+# grid's _on_scale_button_pressed(), which opens/refreshes Settings) - this
+# is Music Mode's own picker, so picking a scale here should only ever
+# affect Music Mode's own UI. Panel stays open after picking (same as
+# Settings' scale grid does), so previewing several scales in a row doesn't
+# mean reopening the panel each time.
+func _on_music_scale_card_pressed(index: int) -> void:
+	if not _is_unlocked(GameData.SCALES[index]):
+		return
+	current_scale_index = index
+	_apply_scale_and_palette()
 
 # Style picker lives *inside* the Tune panel (not a separate modal) - a
 # player picking a style needs to watch the sliders move and keep adjusting
@@ -1699,6 +1887,10 @@ func _apply_scale_and_palette() -> void:
 	# the scale changes, not just when a style is picked (see
 	# _refresh_style_cards()) - a no-op before the Tune panel's rows exist yet.
 	_refresh_style_cards()
+	# Same idea for Music Mode's own scale picker - keeps its active-card
+	# highlight in sync with whichever scale is actually loaded, regardless
+	# of whether it was changed here, from Settings, or on scale unlock.
+	_refresh_music_scale_cards()
 
 # Picks black-or-white note-label text (with a matching soft shadow) by
 # whichever contrasts better against BOTH the pad's resting and lit color -
