@@ -187,6 +187,20 @@ const MUSIC_GLISSANDO_FLASH_FRACTION := 0.75
 # pure random walk at the start of a phrase. Frequency is player-tunable via
 # the "riff_shapes" idiom slider.
 const MUSIC_RIFF_SHAPES := [[0, 2, 4, 2], [0, 1, 2, 3, 4], [0, 2, 1, 3, 0], [0, 4, 2, 0]]
+# Cadential figure (the "cadence" idiom - see GameData.MUSIC_STYLES) - a
+# short, settling contour seeded at the *end* of a phrase instead of the
+# start, standing in for two real closing devices researched for the Style
+# presets: Arabic maqam's qafla (a fixed melodic tag that closes a taqsim
+# section, always resolving to the tonic) and reggae bass's descending
+# "walkdown" fill at section transitions. Reuses the exact riff-seeding
+# mechanism riff_shapes already has (see _generate_music_bar_melody()) -
+# same code path, different trigger point and shape set, not a new
+# mechanism. Offsets are relative to wherever the walk sits when the last
+# bar starts, ending near 0 (a settling gesture) - the existing phrase-end
+# forced-resolution logic still corrects the very last note to a real
+# tonal-hierarchy-weighted resolution degree regardless, so the cadence
+# shape only has to lead *into* a landing, not predict the exact one.
+const MUSIC_CADENCE_SHAPES := [[2, 1, 0], [-2, -1, 0], [4, 2, 0], [1, -1, 0], [-1, 1, 0]]
 # Normal Mode borrows three of these idioms (anchor return, zigzag contour,
 # riff shapes) since they're pure note-selection bias - they change which
 # pad the walk lands on but never add/remove a note from `sequence`, so the
@@ -348,7 +362,7 @@ const MIX_DEFAULTS := {"Master": 1.0, "Tones": 0.9, "UI": 0.5}
 # a satisfying "extreme" - e.g. glissando's default of a rare 10% chance -
 # can still have a max worth dragging to (was capped at 20% under a
 # symmetric range, which a player at 100% would barely ever hear).
-const MUSIC_IDIOM_KEYS := ["anchor_return", "zigzag_bias", "groove_repeats", "ghost_notes", "glissando", "riff_shapes", "offbeat_accent", "chord_tone_bias", "call_response", "fourth_octave"]
+const MUSIC_IDIOM_KEYS := ["anchor_return", "zigzag_bias", "groove_repeats", "ghost_notes", "glissando", "riff_shapes", "offbeat_accent", "chord_tone_bias", "call_response", "fourth_octave", "enclosure", "cadence"]
 const MUSIC_IDIOM_RANGES := {
 	"anchor_return": {"min": 0.0, "default": 0.12, "max": 0.45},
 	"zigzag_bias": {"min": 0.5, "default": 0.75, "max": 1.0},
@@ -356,18 +370,21 @@ const MUSIC_IDIOM_RANGES := {
 	"ghost_notes": {"min": 0.0, "default": 0.18, "max": 0.45},
 	"glissando": {"min": 0.0, "default": 0.1, "max": 0.85},
 	"riff_shapes": {"min": 0.0, "default": 0.25, "max": 0.6},
-	# The four idioms Style presets added (see GameData.MUSIC_STYLES). Unlike
-	# the original six, none of these has a generic, style-independent
-	# "tuned baseline" - offbeat accenting, extra chord-tone nudging, and
-	# call-and-response phrasing are specific idioms particular styles use,
-	# not something a handpan is always doing a little of. So min == default
-	# (0.0) for all four: _music_idiom_value_at() detects that and falls back
-	# to a plain linear 0..max lerp instead of the two-segment default-at-50%
-	# shape the original six use.
+	# The idioms Style presets added (see GameData.MUSIC_STYLES). Unlike the
+	# original six, none of these has a generic, style-independent "tuned
+	# baseline" - offbeat accenting, extra chord-tone nudging, call-and-
+	# response phrasing, enclosure, and cadential figures are specific
+	# idioms particular styles use, not something a handpan is always doing
+	# a little of. So min == default (0.0) for all of them:
+	# _music_idiom_value_at() detects that and falls back to a plain linear
+	# 0..max lerp instead of the two-segment default-at-50% shape the
+	# original six use.
 	"offbeat_accent": {"min": 0.0, "default": 0.0, "max": 1.0},
 	"chord_tone_bias": {"min": 0.0, "default": 0.0, "max": 0.9},
 	"call_response": {"min": 0.0, "default": 0.0, "max": 1.0},
 	"fourth_octave": {"min": 0.0, "default": 0.0, "max": 1.0},
+	"enclosure": {"min": 0.0, "default": 0.0, "max": 0.85},
+	"cadence": {"min": 0.0, "default": 0.0, "max": 0.85},
 }
 @onready var music_idiom_sliders: Dictionary = {
 	"anchor_return": %AnchorSlider,
@@ -522,6 +539,8 @@ const MUSIC_VIZ_TAG_COLORS := {
 	# Tune-panel idiom (the "chord_tone_bias" slider), it gets a color like
 	# every other tunable idiom, matching that slider's swatch.
 	"chord": Color(0.95, 0.75, 0.4),
+	"enclosure": Color(0.85, 0.4, 0.85),
+	"cadence": Color(0.45, 0.85, 0.55),
 }
 # Ripple pulse on the physical pad itself when an idiom fires (see
 # docs/music-mode.md#visualizing-the-idioms) - colored by MUSIC_VIZ_TAG_COLORS,
@@ -541,6 +560,8 @@ const MUSIC_VIZ_TAG_LABELS := {
 	"glissando": "glissando",
 	"zigzag": "zigzag cross",
 	"response": "call & response",
+	"enclosure": "enclosure",
+	"cadence": "cadential figure",
 }
 var _music_viz_history: Array[Dictionary] = []
 var _music_last_bar_tags: Array[String] = []
@@ -559,7 +580,7 @@ var onboarding_seen := false
 var onboarding_step := 0
 var mix_levels: Dictionary = MIX_DEFAULTS.duplicate()
 var reduce_motion := false
-var music_idiom_levels: Dictionary = {"anchor_return": 0.5, "zigzag_bias": 0.5, "groove_repeats": 0.5, "ghost_notes": 0.5, "glissando": 0.5, "riff_shapes": 0.5, "offbeat_accent": 0.0, "chord_tone_bias": 0.0, "call_response": 0.0, "fourth_octave": 0.0}
+var music_idiom_levels: Dictionary = {"anchor_return": 0.5, "zigzag_bias": 0.5, "groove_repeats": 0.5, "ghost_notes": 0.5, "glissando": 0.5, "riff_shapes": 0.5, "offbeat_accent": 0.0, "chord_tone_bias": 0.0, "call_response": 0.0, "fourth_octave": 0.0, "enclosure": 0.0, "cadence": 0.0}
 var run_start_best_score := 0
 var run_start_best_round := 0
 var run_start_best_combo := 0
@@ -870,23 +891,17 @@ func _build_scale_cards() -> void:
 		vbox.add_child(unlock_label)
 		scale_card_unlock_labels.append(unlock_label)
 
-# Music Style panel/cards (see GameData.MUSIC_STYLES) - built entirely in
-# code, same reasoning as _build_scale_cards() just above: a handful of
-# near-identical cards generated from data is far less error-prone than
-# hand-authoring them in the .tscn. A sibling of MusicTunePanel (not nested
-# inside it), reachable only from MusicBar's new StyleButton, so it's never
-# exposed outside Music Mode. No unlock gating - styles are free/always
-# available - so cards only ever show active/inactive, never a lock.
-# The four idioms Style presets added (offbeat accent, chord-tone bias,
-# call & response, 4th/octave resolution - see GameData.MUSIC_STYLES) get
-# their own Tune-panel rows, same as the original six - built in code and
+# The idioms Style presets added (offbeat accent, chord-tone bias, call &
+# response, 4th/octave resolution, enclosure, cadential figure - see
+# GameData.MUSIC_STYLES) get their own Tune-panel rows, same as the
+# original six - built in code and
 # spliced into the existing hand-authored VBoxContainer (found via the
 # close button's parent, since that inner container has no unique name of
 # its own) rather than hand-editing the .tscn, same reasoning as
 # _build_scale_cards(). Registers each new slider/label into the existing
 # music_idiom_sliders/music_idiom_pct_labels dicts so _setup_music_idiom_sliders()
-# (which loops MUSIC_IDIOM_KEYS - now ten entries, not six) wires all ten
-# identically, no special-casing the new four.
+# (which loops MUSIC_IDIOM_KEYS - now twelve entries, not six) wires all of
+# them identically, no special-casing the new ones.
 func _build_extra_idiom_rows() -> void:
 	var vbox: VBoxContainer = music_tune_close_button.get_parent()
 	var rows := [
@@ -898,6 +913,10 @@ func _build_extra_idiom_rows() -> void:
 			"tooltip": "How often a phrase echoes its own first half back instead of arching through a free walk."},
 		{"key": "fourth_octave", "label": "4th/Octave Pull", "color": Color(0.5, 0.7, 1.0),
 			"tooltip": "Shifts melodic resolution from the Western 3rd/5th toward the 4th and octave instead."},
+		{"key": "enclosure", "label": "Enclosure", "color": Color(0.85, 0.4, 0.85),
+			"tooltip": "How often a phrase's landing note gets surrounded by two quick neighbor notes right before it - a bebop technique."},
+		{"key": "cadence", "label": "Cadential Figure", "color": Color(0.45, 0.85, 0.55),
+			"tooltip": "How often a phrase closes with a short settling run instead of just arriving - maqam's qafla, reggae's bass \"walkdown.\""},
 	]
 	for row_def in rows:
 		var key: String = row_def["key"]
@@ -2380,8 +2399,12 @@ func _generate_music_bar_melody(pulse_count: int, accented_pulse_index: int = 0)
 	# walk currently sits, not hardcoded to degree 0, so it still works when
 	# a session opens on a non-tonic degree (see _music_reset_walk()).
 	var riff: Array = []
+	var riff_tag := "riff"
 	if phrase_position == 0 and randf() < _music_idiom_value("riff_shapes"):
 		riff = MUSIC_RIFF_SHAPES[randi() % MUSIC_RIFF_SHAPES.size()]
+	elif phrase_position == MUSIC_PHRASE_BARS - 1 and randf() < _music_idiom_value("cadence"):
+		riff = MUSIC_CADENCE_SHAPES[randi() % MUSIC_CADENCE_SHAPES.size()]
+		riff_tag = "cadence"
 	var riff_base := _music_current_degree
 	# Whether the *previous* note's direction pick actually leaned on
 	# zigzag_bias (SequenceGenerator.walk_next_step()'s "used_zigzag") - if
@@ -2392,7 +2415,7 @@ func _generate_music_bar_melody(pulse_count: int, accented_pulse_index: int = 0)
 		if i < riff.size():
 			var riff_degree := _reflect_degree(riff_base + int(riff[i]))
 			degrees.append(riff_degree)
-			tags.append("riff")
+			tags.append(riff_tag)
 			_music_current_degree = riff_degree
 			_music_last_direction = 0
 			_music_repeat_streak = 1
@@ -2459,6 +2482,21 @@ func _generate_music_bar_melody(pulse_count: int, accented_pulse_index: int = 0)
 	_music_bar_index += 1
 	if _music_bar_index % MUSIC_PHRASE_BARS == 0:
 		var resolution_degree := _pick_resolution_degree(scale)
+		# Enclosure (the "enclosure" idiom - see GameData.MUSIC_STYLES): the
+		# real bebop technique surrounds a chord-tone landing with two quick
+		# lead-in notes, one ring-neighbor above and one below, immediately
+		# before it. The phrase-end resolution landing is this generator's
+		# one guaranteed, predictable chord-tone landing, so that's where
+		# enclosure hooks in - overwriting the two notes just before it
+		# (already-generated slots, not new ones) rather than needing to
+		# predict a landing further ahead in the per-pulse loop. Needs at
+		# least 3 notes in the bar to have two lead-in slots to use.
+		if degrees.size() >= 3 and randf() < _music_idiom_value("enclosure"):
+			var n := degrees.size()
+			degrees[n - 3] = _reflect_degree(resolution_degree - 1)
+			degrees[n - 2] = _reflect_degree(resolution_degree + 1)
+			tags[n - 3] = "enclosure"
+			tags[n - 2] = "enclosure"
 		degrees[degrees.size() - 1] = resolution_degree
 		tags[tags.size() - 1] = "resolve"
 		_music_current_degree = resolution_degree

@@ -153,7 +153,9 @@ const MUSIC_STYLES := [
 		# call_response 0.28: real and "integral" per sources, but secondary to
 		# the one-drop groove itself - horn/vocal answer phrases happen
 		# periodically, not on every phrase the way Junkanoo's do.
-		"idiom_preset": {"offbeat_accent": 0.9, "chord_tone_bias": 0.75, "call_response": 0.28, "fourth_octave": 0.0, "groove_repeats": 0.85},
+		# cadence 0.35: reggae bass's descending "walkdown" fill is real but
+		# specifically a section-transition device, not a per-phrase habit.
+		"idiom_preset": {"offbeat_accent": 0.9, "chord_tone_bias": 0.75, "call_response": 0.28, "fourth_octave": 0.0, "groove_repeats": 0.85, "cadence": 0.35},
 		"resolution_secondary_weight": 2.1,
 		"rhythm_pulses_min": 3, "rhythm_pulses_max": 6,
 		"max_leap_override": null, "flat_arch": false},
@@ -166,7 +168,10 @@ const MUSIC_STYLES := [
 		# call_response 0.12: weak/metaphorical at best - istikhbar is
 		# described as the performer "eliciting" a response from the maqam
 		# itself, a solo internal dialogue, not literally alternating voices.
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.12, "fourth_octave": 0.0, "glissando": 0.85, "ghost_notes": 0.8},
+		# cadence 0.75: qafla is a defining structural feature of taqsim -
+		# a fixed melodic tag that closes a section, always resolving to the
+		# tonic. About as central to maqam as call & response is to Balkan.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.1, "call_response": 0.12, "fourth_octave": 0.0, "glissando": 0.85, "ghost_notes": 0.8, "cadence": 0.75},
 		"resolution_secondary_weight": 0.9,
 		"rhythm_pulses_min": 4, "rhythm_pulses_max": 8,
 		"max_leap_override": null, "flat_arch": false},
@@ -201,7 +206,10 @@ const MUSIC_STYLES := [
 		# just incidental); licks are a standard, practiced part of the
 		# vocabulary ("5 to 10 memorized phrases... every now and then") -
 		# real but not dominant, hence a modest rather than large raise.
-		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.65, "call_response": 0.55, "fourth_octave": 0.0, "zigzag_bias": 0.95, "ghost_notes": 0.6, "riff_shapes": 0.55},
+		# enclosure 0.7: "a very important part of the jazz language
+		# especially used by bebop players" - the real technique this idiom
+		# is modeled on, and the strongest-evidenced addition of this pass.
+		"idiom_preset": {"offbeat_accent": 0.0, "chord_tone_bias": 0.65, "call_response": 0.55, "fourth_octave": 0.0, "zigzag_bias": 0.95, "ghost_notes": 0.6, "riff_shapes": 0.55, "enclosure": 0.7},
 		"resolution_secondary_weight": 1.5,
 		"rhythm_pulses_min": 6, "rhythm_pulses_max": 10,
 		"max_leap_override": null, "flat_arch": false},
