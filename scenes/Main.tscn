@@ -11,6 +11,20 @@ corner_radius_bottom_left = 80
 shadow_color = Color(0, 0, 0, 0.35)
 shadow_size = 10
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_settingsbg"]
+bg_color = Color(0.07, 0.07, 0.09, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.08)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 12
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_track"]
 bg_color = Color(1, 1, 1, 0.14)
 corner_radius_top_left = 7
@@ -19,25 +33,11 @@ corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_fill"]
-bg_color = Color(0.55, 0.78, 1.0, 0.95)
+bg_color = Color(0.55, 0.78, 1, 0.95)
 corner_radius_top_left = 7
 corner_radius_top_right = 7
 corner_radius_bottom_right = 7
 corner_radius_bottom_left = 7
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_settingsbg"]
-bg_color = Color(0.07, 0.07, 0.09, 0.98)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 1, 1, 0.08)
-shadow_color = Color(0, 0, 0, 0.4)
-shadow_size = 12
 
 [node name="Main" type="Control" unique_id=1623531381]
 layout_mode = 3
@@ -65,7 +65,7 @@ offset_right = 480.0
 offset_bottom = 480.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_resonator")
 
-[node name="DuetRing" type="Control" parent="." unique_id=3517182609]
+[node name="DuetRing" type="Control" parent="." unique_id=-777784687]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -74,7 +74,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ConstellationLayer" type="Control" parent="." unique_id=2891447603]
+[node name="ConstellationLayer" type="Control" parent="." unique_id=-1403519693]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -92,9 +92,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="HeartsLabel" type="Label" parent="." unique_id=4127850136]
+[node name="HeartsLabel" type="Label" parent="." unique_id=-167117160]
 layout_mode = 1
-anchors_preset = 0
 offset_left = 20.0
 offset_top = 24.0
 offset_right = 220.0
@@ -146,7 +145,7 @@ theme_override_font_sizes/font_size = 24
 text = "Score: 0"
 horizontal_alignment = 2
 
-[node name="CashOutButton" type="Button" parent="."]
+[node name="CashOutButton" type="Button" parent="." unique_id=2114969070]
 visible = false
 layout_mode = 1
 anchors_preset = 1
@@ -160,7 +159,7 @@ grow_horizontal = 0
 theme_override_font_sizes/font_size = 18
 text = "Cash Out"
 
-[node name="ModeBar" type="HBoxContainer" parent="."]
+[node name="ModeBar" type="HBoxContainer" parent="." unique_id=1697808401]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -183,6 +182,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Chaos Mode"
 
+[node name="DuetButton" type="Button" parent="ModeBar" unique_id=335780671]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Duet Mode"
+
 [node name="ZenButton" type="Button" parent="ModeBar" unique_id=335780669]
 unique_name_in_owner = true
 layout_mode = 2
@@ -192,11 +196,6 @@ text = "Zen Mode"
 unique_name_in_owner = true
 layout_mode = 2
 text = "Music Mode"
-
-[node name="DuetButton" type="Button" parent="ModeBar" unique_id=335780671]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Duet Mode"
 
 [node name="ZenBar" type="Control" parent="." unique_id=578271270]
 visible = false
@@ -256,7 +255,7 @@ offset_right = 220.0
 offset_bottom = 76.0
 text = "Exit Music"
 
-[node name="TuneButton" type="Button" parent="MusicBar"]
+[node name="TuneButton" type="Button" parent="MusicBar" unique_id=378817208]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 230.0
@@ -280,7 +279,7 @@ grow_horizontal = 0
 grow_vertical = 0
 text = "Settings"
 
-[node name="HelpButton" type="Button" parent="."]
+[node name="HelpButton" type="Button" parent="." unique_id=1390285636]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -292,7 +291,7 @@ offset_bottom = -20.0
 grow_vertical = 0
 text = "?"
 
-[node name="FaqButton" type="Button" parent="."]
+[node name="FaqButton" type="Button" parent="." unique_id=1280216141]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -352,33 +351,30 @@ theme_override_font_sizes/font_size = 26
 text = "Choose a Modifier"
 horizontal_alignment = 1
 
-[node name="OptionsRow" type="HBoxContainer" parent="ModifierPanel/CenterContainer/VBoxContainer"]
+[node name="OptionsRow" type="HBoxContainer" parent="ModifierPanel/CenterContainer/VBoxContainer" unique_id=41377428]
 layout_mode = 2
 theme_override_constants/separation = 12
 
 [node name="Option1" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=2018001135]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(248, 340)
-layout_mode = 2
-toggle_mode = false
-autowrap_mode = 2
 clip_contents = true
+layout_mode = 2
+autowrap_mode = 2
 
 [node name="Option2" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=340764271]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(248, 340)
-layout_mode = 2
-toggle_mode = false
-autowrap_mode = 2
 clip_contents = true
+layout_mode = 2
+autowrap_mode = 2
 
 [node name="Option3" type="Button" parent="ModifierPanel/CenterContainer/VBoxContainer/OptionsRow" unique_id=1242946524]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(248, 340)
-layout_mode = 2
-toggle_mode = false
-autowrap_mode = 2
 clip_contents = true
+layout_mode = 2
+autowrap_mode = 2
 
 [node name="SettingsPanel" type="Control" parent="." unique_id=456314169]
 visible = false
@@ -406,7 +402,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ContentBox" type="VBoxContainer" parent="SettingsPanel/CenterContainer"]
+[node name="ContentBox" type="VBoxContainer" parent="SettingsPanel/CenterContainer" unique_id=326781358]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -416,109 +412,110 @@ custom_minimum_size = Vector2(680, 0)
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="TitleBlock" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+[node name="TitleBlock" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow" unique_id=593273095]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="TitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock"]
+[node name="TitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock" unique_id=921574381]
 layout_mode = 2
 theme_override_font_sizes/font_size = 19
 text = "SIMON"
 
-[node name="SubtitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock"]
+[node name="SubtitleLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/TitleBlock" unique_id=951696935]
+modulate = Color(1, 1, 1, 0.6)
 layout_mode = 2
 theme_override_font_sizes/font_size = 11
 text = "Steel Tongue Drum Edition · Settings"
-modulate = Color(1, 1, 1, 0.6)
 
-[node name="HeaderSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+[node name="HeaderSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow" unique_id=973365552]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="StatRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+[node name="StatRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow" unique_id=962451210]
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="ScoreTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+[node name="ScoreTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow" unique_id=401868386]
 layout_mode = 2
 theme_override_constants/separation = 2
 alignment = 1
 
-[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile"]
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile" unique_id=1914334555]
+modulate = Color(1, 1, 1, 0.6)
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "BEST SCORE"
 horizontal_alignment = 2
-modulate = Color(1, 1, 1, 0.6)
 
-[node name="ScoreTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile"]
+[node name="ScoreTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ScoreTile" unique_id=239373530]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "0"
 horizontal_alignment = 2
 
-[node name="RoundTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+[node name="RoundTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow" unique_id=291690163]
 layout_mode = 2
 theme_override_constants/separation = 2
 alignment = 1
 
-[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile"]
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile" unique_id=1278708887]
+modulate = Color(1, 1, 1, 0.6)
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "BEST ROUND"
 horizontal_alignment = 2
-modulate = Color(1, 1, 1, 0.6)
 
-[node name="RoundTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile"]
+[node name="RoundTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/RoundTile" unique_id=143359119]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "0"
 horizontal_alignment = 2
 
-[node name="ComboTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow"]
+[node name="ComboTile" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow" unique_id=1490728689]
 layout_mode = 2
 theme_override_constants/separation = 2
 alignment = 1
 
-[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile"]
+[node name="CaptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile" unique_id=606562084]
+modulate = Color(1, 1, 1, 0.6)
 layout_mode = 2
 theme_override_font_sizes/font_size = 10
 text = "BEST COMBO"
 horizontal_alignment = 2
-modulate = Color(1, 1, 1, 0.6)
 
-[node name="ComboTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile"]
+[node name="ComboTileValueLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow/StatRow/ComboTile" unique_id=242895417]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "0"
 horizontal_alignment = 2
 
-[node name="CloseXButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow"]
+[node name="CloseXButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/HeaderRow" unique_id=747245903]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(32, 32)
 layout_mode = 2
 size_flags_vertical = 4
 text = "×"
 
-[node name="PanelBG" type="PanelContainer" parent="SettingsPanel/CenterContainer/ContentBox"]
+[node name="PanelBG" type="PanelContainer" parent="SettingsPanel/CenterContainer/ContentBox" unique_id=1770494517]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_settingsbg")
 
-[node name="TabContainer" type="TabContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG"]
+[node name="TabContainer" type="TabContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG" unique_id=1732260299]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(680, 380)
 layout_mode = 2
+current_tab = 0
 
-[node name="Scales" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
-visible = false
+[node name="Scales" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer" unique_id=1230162765]
 layout_mode = 2
 horizontal_scroll_mode = 0
+metadata/_tab_index = 0
 
-[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales"]
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales" unique_id=1719931822]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 16
@@ -526,19 +523,20 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="ScaleGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales/Margin"]
+[node name="ScaleGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Scales/Margin" unique_id=2052043112]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 10
 theme_override_constants/v_separation = 10
 columns = 2
 
-[node name="Themes" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+[node name="Themes" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer" unique_id=1951160179]
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+metadata/_tab_index = 1
 
-[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes"]
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes" unique_id=1296479523]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 16
@@ -546,46 +544,46 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin" unique_id=548748221]
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="ThemeCenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer"]
+[node name="ThemeCenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer" unique_id=743601575]
 layout_mode = 2
 
-[node name="ThemeGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/ThemeCenterContainer"]
+[node name="ThemeGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/ThemeCenterContainer" unique_id=981229602]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
 columns = 3
 
-[node name="PaletteSection" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer"]
+[node name="PaletteSection" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer" unique_id=343989332]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PaletteSectionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection"]
+[node name="PaletteSectionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection" unique_id=1232825868]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "Premium & Minimal pairs with any pad palette - pick one:"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="PaletteGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection"]
+[node name="PaletteGrid" type="GridContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Themes/Margin/VBoxContainer/PaletteSection" unique_id=1695560594]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/h_separation = 8
 theme_override_constants/v_separation = 8
-columns = 1
 
-[node name="Audio" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+[node name="Audio" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer" unique_id=1527782415]
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+metadata/_tab_index = 2
 
-[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio"]
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio" unique_id=2116380534]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 16
@@ -593,23 +591,23 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin"]
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin" unique_id=1466507239]
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="MasterRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer" unique_id=345873364]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+[node name="MasterRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer" unique_id=1974768438]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow" unique_id=1352925736]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "Master"
 
-[node name="MasterSlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+[node name="MasterSlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow" unique_id=1065245311]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
@@ -621,23 +619,23 @@ max_value = 1.0
 step = 0.01
 value = 1.0
 
-[node name="MasterPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow"]
+[node name="MasterPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/MasterRow" unique_id=951875391]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "100%"
 horizontal_alignment = 2
 
-[node name="TonesRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+[node name="TonesRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer" unique_id=671729770]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow" unique_id=1787739444]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "Tones"
 
-[node name="TonesSlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+[node name="TonesSlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow" unique_id=1002404172]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
@@ -649,23 +647,23 @@ max_value = 1.0
 step = 0.01
 value = 0.9
 
-[node name="TonesPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow"]
+[node name="TonesPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/TonesRow" unique_id=737844092]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "90%"
 horizontal_alignment = 2
 
-[node name="UIRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer"]
+[node name="UIRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer" unique_id=243024960]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+[node name="Label" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow" unique_id=412822865]
 custom_minimum_size = Vector2(80, 0)
 layout_mode = 2
 text = "UI"
 
-[node name="UISlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+[node name="UISlider" type="HSlider" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow" unique_id=873392270]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(220, 18)
 layout_mode = 2
@@ -677,19 +675,20 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="UIPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow"]
+[node name="UIPctLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Audio/Margin/CenterContainer/VBoxContainer/UIRow" unique_id=258495084]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="Accessibility" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer"]
+[node name="Accessibility" type="ScrollContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer" unique_id=307121326]
 visible = false
 layout_mode = 2
 horizontal_scroll_mode = 0
+metadata/_tab_index = 3
 
-[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility"]
+[node name="Margin" type="MarginContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility" unique_id=362132348]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 16
@@ -697,21 +696,21 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin"]
+[node name="CenterContainer" type="CenterContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin" unique_id=156421494]
 layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer" unique_id=420580574]
 custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ReduceMotionCheck" type="CheckBox" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer"]
+[node name="ReduceMotionCheck" type="CheckBox" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer" unique_id=927296153]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 4
 text = "Reduce screen shake & flash"
 
-[node name="DescriptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer"]
+[node name="DescriptionLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/PanelBG/TabContainer/Accessibility/Margin/CenterContainer/VBoxContainer" unique_id=1208403051]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 text = "Softens the camera shake and color flash on hits, misses, and forgiveness so they're less intense - useful if fast motion or flashing is uncomfortable."
@@ -729,31 +728,31 @@ custom_minimum_size = Vector2(160, 44)
 layout_mode = 2
 text = "Reset Progress"
 
-[node name="ConfirmRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow"]
+[node name="ConfirmRow" type="HBoxContainer" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow" unique_id=1842734632]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ConfirmLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+[node name="ConfirmLabel" type="Label" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow" unique_id=855511433]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
 text = "Reset all progress? This can't be undone."
 vertical_alignment = 1
 
-[node name="ConfirmYesButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+[node name="ConfirmYesButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow" unique_id=1285794209]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "Confirm Reset"
 
-[node name="ConfirmNoButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow"]
+[node name="ConfirmNoButton" type="Button" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow/ConfirmRow" unique_id=440851408]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(90, 40)
 layout_mode = 2
 text = "Cancel"
 
-[node name="ButtonSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow"]
+[node name="ButtonSpacer" type="Control" parent="SettingsPanel/CenterContainer/ContentBox/ButtonRow" unique_id=1504573696]
 layout_mode = 2
 size_flags_horizontal = 3
 
@@ -763,7 +762,7 @@ custom_minimum_size = Vector2(120, 44)
 layout_mode = 2
 text = "Close"
 
-[node name="OnboardingPanel" type="Control" parent="."]
+[node name="OnboardingPanel" type="Control" parent="." unique_id=1839060565]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -772,7 +771,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Dim" type="ColorRect" parent="OnboardingPanel"]
+[node name="Dim" type="ColorRect" parent="OnboardingPanel" unique_id=1515961172]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -781,7 +780,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.65)
 
-[node name="CenterContainer" type="CenterContainer" parent="OnboardingPanel"]
+[node name="CenterContainer" type="CenterContainer" parent="OnboardingPanel" unique_id=1684522452]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -789,12 +788,12 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="OnboardingPanel/CenterContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="OnboardingPanel/CenterContainer" unique_id=1745125311]
 custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="StepIndicatorLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+[node name="StepIndicatorLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer" unique_id=235969513]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.65, 0.7, 1)
@@ -802,14 +801,14 @@ theme_override_font_sizes/font_size = 14
 text = "Step 1 / 4"
 horizontal_alignment = 1
 
-[node name="TitleLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer" unique_id=1621062970]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
 text = "Title"
 horizontal_alignment = 1
 
-[node name="BodyLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+[node name="BodyLabel" type="Label" parent="OnboardingPanel/CenterContainer/VBoxContainer" unique_id=676999079]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
@@ -818,24 +817,24 @@ text = "Body"
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="ButtonRow" type="HBoxContainer" parent="OnboardingPanel/CenterContainer/VBoxContainer"]
+[node name="ButtonRow" type="HBoxContainer" parent="OnboardingPanel/CenterContainer/VBoxContainer" unique_id=1421341705]
 layout_mode = 2
 theme_override_constants/separation = 12
 alignment = 1
 
-[node name="SkipButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow"]
+[node name="SkipButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow" unique_id=294332168]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(100, 44)
 layout_mode = 2
 text = "Skip"
 
-[node name="NextButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow"]
+[node name="NextButton" type="Button" parent="OnboardingPanel/CenterContainer/VBoxContainer/ButtonRow" unique_id=357020298]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 44)
 layout_mode = 2
 text = "Next"
 
-[node name="FaqPanel" type="Control" parent="."]
+[node name="FaqPanel" type="Control" parent="." unique_id=1326865574]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -844,7 +843,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Dim" type="ColorRect" parent="FaqPanel"]
+[node name="Dim" type="ColorRect" parent="FaqPanel" unique_id=126417597]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -853,7 +852,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.72)
 
-[node name="CenterContainer" type="CenterContainer" parent="FaqPanel"]
+[node name="CenterContainer" type="CenterContainer" parent="FaqPanel" unique_id=924545492]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -861,53 +860,53 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ContentBox" type="VBoxContainer" parent="FaqPanel/CenterContainer"]
+[node name="ContentBox" type="VBoxContainer" parent="FaqPanel/CenterContainer" unique_id=1786836852]
 custom_minimum_size = Vector2(520, 0)
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="PanelBG" type="PanelContainer" parent="FaqPanel/CenterContainer/ContentBox"]
+[node name="PanelBG" type="PanelContainer" parent="FaqPanel/CenterContainer/ContentBox" unique_id=223359092]
 custom_minimum_size = Vector2(520, 560)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_settingsbg")
 
-[node name="Margin" type="MarginContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG"]
+[node name="Margin" type="MarginContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG" unique_id=383589051]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 20
 
-[node name="VBoxContainer" type="VBoxContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin" unique_id=1337206790]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1563068508]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "FAQ"
 horizontal_alignment = 1
 
-[node name="ScrollContainer" type="ScrollContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="ScrollContainer" type="ScrollContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1851129348]
 custom_minimum_size = Vector2(0, 440)
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="QAList" type="VBoxContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ScrollContainer"]
+[node name="QAList" type="VBoxContainer" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ScrollContainer" unique_id=1906885299]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(480, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 18
 
-[node name="FaqCloseButton" type="Button" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="FaqCloseButton" type="Button" parent="FaqPanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=156005430]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Close"
 
-[node name="MusicTunePanel" type="Control" parent="."]
+[node name="MusicTunePanel" type="Control" parent="." unique_id=1151329647]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -916,7 +915,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Dim" type="ColorRect" parent="MusicTunePanel"]
+[node name="Dim" type="ColorRect" parent="MusicTunePanel" unique_id=1488675114]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -925,7 +924,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.72)
 
-[node name="CenterContainer" type="CenterContainer" parent="MusicTunePanel"]
+[node name="CenterContainer" type="CenterContainer" parent="MusicTunePanel" unique_id=1390286645]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -933,43 +932,43 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="ContentBox" type="VBoxContainer" parent="MusicTunePanel/CenterContainer"]
+[node name="ContentBox" type="VBoxContainer" parent="MusicTunePanel/CenterContainer" unique_id=1431963713]
 custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="PanelBG" type="PanelContainer" parent="MusicTunePanel/CenterContainer/ContentBox"]
+[node name="PanelBG" type="PanelContainer" parent="MusicTunePanel/CenterContainer/ContentBox" unique_id=57555090]
 custom_minimum_size = Vector2(420, 0)
 layout_mode = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_settingsbg")
 
-[node name="Margin" type="MarginContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG"]
+[node name="Margin" type="MarginContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG" unique_id=717854225]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 20
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin"]
+[node name="VBoxContainer" type="VBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin" unique_id=1346267977]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="TitleLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1742675386]
 layout_mode = 2
 theme_override_font_sizes/font_size = 22
 text = "Music Tuning"
 horizontal_alignment = 1
 
-[node name="AnchorRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="AnchorRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=250288531]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow" unique_id=1905795033]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Anchor Return"
 
-[node name="AnchorSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+[node name="AnchorSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow" unique_id=987510500]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -981,23 +980,23 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="AnchorPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow"]
+[node name="AnchorPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/AnchorRow" unique_id=1029364435]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="ZigzagRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="ZigzagRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1712912054]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=1888794273]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Zigzag Bias"
 
-[node name="ZigzagSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+[node name="ZigzagSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=1080904465]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -1009,23 +1008,23 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="ZigzagPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow"]
+[node name="ZigzagPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/ZigzagRow" unique_id=1240216172]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="GrooveRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="GrooveRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=225408301]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow" unique_id=534898099]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Groove Repeats"
 
-[node name="GrooveSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+[node name="GrooveSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow" unique_id=197702317]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -1037,23 +1036,23 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="GroovePctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow"]
+[node name="GroovePctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GrooveRow" unique_id=1842574066]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="GhostRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="GhostRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=2059543597]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow" unique_id=361581123]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Ghost Notes"
 
-[node name="GhostSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+[node name="GhostSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow" unique_id=320527079]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -1065,23 +1064,23 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="GhostPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow"]
+[node name="GhostPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GhostRow" unique_id=521703310]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="GlissandoRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="GlissandoRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1484050175]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow" unique_id=1100676999]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Glissando"
 
-[node name="GlissandoSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+[node name="GlissandoSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow" unique_id=54820456]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -1093,23 +1092,23 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="GlissandoPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow"]
+[node name="GlissandoPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/GlissandoRow" unique_id=2047715275]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="RiffRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="RiffRow" type="HBoxContainer" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=423453462]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+[node name="Label" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow" unique_id=1024833532]
 custom_minimum_size = Vector2(140, 0)
 layout_mode = 2
 text = "Riff Shapes"
 
-[node name="RiffSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+[node name="RiffSlider" type="HSlider" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow" unique_id=6931092]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 18)
 layout_mode = 2
@@ -1121,20 +1120,20 @@ max_value = 1.0
 step = 0.01
 value = 0.5
 
-[node name="RiffPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow"]
+[node name="RiffPctLabel" type="Label" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer/RiffRow" unique_id=1693932472]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
 text = "50%"
 horizontal_alignment = 2
 
-[node name="MusicTuneCloseButton" type="Button" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer"]
+[node name="MusicTuneCloseButton" type="Button" parent="MusicTunePanel/CenterContainer/ContentBox/PanelBG/Margin/VBoxContainer" unique_id=1974288831]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Close"
 
-[node name="GameOverPanel" type="Control" parent="."]
+[node name="GameOverPanel" type="Control" parent="." unique_id=1955557859]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -1143,7 +1142,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Dim" type="ColorRect" parent="GameOverPanel"]
+[node name="Dim" type="ColorRect" parent="GameOverPanel" unique_id=157808929]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -1152,7 +1151,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0, 0, 0.65)
 
-[node name="CenterContainer" type="CenterContainer" parent="GameOverPanel"]
+[node name="CenterContainer" type="CenterContainer" parent="GameOverPanel" unique_id=32417548]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -1160,34 +1159,33 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GameOverPanel/CenterContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GameOverPanel/CenterContainer" unique_id=1426751518]
 custom_minimum_size = Vector2(380, 0)
 layout_mode = 2
 theme_override_constants/separation = 14
 
-[node name="TitleLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer" unique_id=406481870]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 text = "Game Over"
 horizontal_alignment = 1
 
-[node name="StatsLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+[node name="StatsLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer" unique_id=1425411767]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Score: 0   Round: 0   Combo: 0"
 horizontal_alignment = 1
 
-[node name="BestLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+[node name="BestLabel" type="Label" parent="GameOverPanel/CenterContainer/VBoxContainer" unique_id=1745958674]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 theme_override_font_sizes/font_size = 16
-text = ""
 horizontal_alignment = 1
 
-[node name="GameOverCloseButton" type="Button" parent="GameOverPanel/CenterContainer/VBoxContainer"]
+[node name="GameOverCloseButton" type="Button" parent="GameOverPanel/CenterContainer/VBoxContainer" unique_id=260031416]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 44)
 layout_mode = 2

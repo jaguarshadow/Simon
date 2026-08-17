@@ -31,9 +31,10 @@ func refresh() -> void:
 		shader_material.set_shader_parameter("base_color", base_color)
 		shader_material.set_shader_parameter("lit_color", lit_color)
 
-func flash(duration := 0.4, decay_rate := 3.2, volume := 0.5) -> void:
+func flash(duration := 0.4, decay_rate := 3.2, volume := 0.5, play_sound := true) -> void:
 	_set_glow(1.0)
-	Sound.play_tone(tone_freq, 1.6, volume, decay_rate)
+	if play_sound:
+		Sound.play_tone(tone_freq, 1.6, volume, decay_rate)
 	await get_tree().create_timer(duration).timeout
 	_tween_glow_out()
 

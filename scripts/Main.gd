@@ -58,17 +58,29 @@ const WAVE_RESET_LENGTH := 0
 # threshold instead of each using its own unrelated, by-feel number.
 const MEMORY_SPAN_CEILING := 8
 
-# Cash-out streak bonus: piecewise, not a pure quadratic from zero. Below
-# MEMORY_SPAN_CEILING the bonus is pure linear growth - "normal" territory,
-# a safe/disciplined cash-out here should feel calm, not like leaving a
-# runaway curve on the table. Past it, the steep quadratic term kicks in
-# specifically for the zone where the player is genuinely fighting the
-# memory handoff, which is exactly where the thrill-of-beating-the-odds
-# payout belongs. CASHOUT_LINEAR_K/CASHOUT_QUADRATIC_K were picked so the
-# two pieces agree exactly at the ceiling (s=8 gives the same 128 either
-# way) - a continuity anchor, not just two independently-guessed numbers.
-const CASHOUT_LINEAR_K := 16.0
-const CASHOUT_QUADRATIC_K := 10.0
+# Cash-out streak bonus: multiplicative compounding, not additive/quadratic
+# (docs/round-goals-and-big-numbers.md). Below the player's personal ceiling
+# (cash_out_ceiling, snapshotted per-streak from best_streak_this_run) the
+# bonus compounds gently - a disciplined cash-out should feel calm, not like
+# leaving a runaway curve on the table. Past the ceiling it compounds steeply,
+# reserved for the zone where the player is genuinely beating their own prior
+# record. CASHOUT_BASE was picked so the curve roughly agrees with the old
+# linear-then-quadratic formula at a typical streak length (~8), then
+# deliberately diverges past it.
+const CASHOUT_BASE := 70.0
+const GENTLE_RATE := 0.08
+const STEEP_RATE := 0.35
+
+# permanent_mult (declared with other run state below) grows only from the
+# portion of a streak past cash_out_ceiling, and only on cash-out - never on
+# a cash-out at/below the ceiling, which closes the "spam trivial risk-free
+# cash-outs to farm the multiplier" exploit.
+const PERMANENT_GROWTH_PER_BEYOND := 0.05
+
+# A run's very first streak has no recorded best_streak_this_run yet (starts
+# at 0) - this floor gives it a brief calm ramp instead of sitting entirely
+# in the steep zone.
+const BOOTSTRAP_FLOOR := 3
 
 # Cash-Out Floor: closes the "spam tiny risk-free cash-outs forever" loophole
 # (a patient player could otherwise trivially satisfy every milestone gate -
@@ -483,6 +495,15 @@ var rubato_two_directional := false
 
 # Per-streak / per-run mechanic state.
 var best_streak_this_run := 0
+# Snapshotted from best_streak_this_run at the start of each streak (run
+# start and every cash-out, in _start_new_streak_modifier_state) rather than
+# read live - best_streak_this_run updates mid-streak the moment a new
+# record is set, so reading it live at cash-out time would always show the
+# current streak tying its own ceiling instead of the ceiling it had to beat.
+var cash_out_ceiling := BOOTSTRAP_FLOOR
+# Run-wide, persists across cash-outs (reset only at run start) - see
+# docs/round-goals-and-big-numbers.md.
+var permanent_mult := 1.0
 var current_streak_had_miss := false
 var run_cashout_count := 0
 var cash_out_floor := 0
@@ -2102,6 +2123,7 @@ func _on_start_pressed(mode: String) -> void:
 	run_cashout_count = 0
 	cash_out_floor = 0
 	best_streak_this_run = 0
+	permanent_mult = 1.0
 	equipped_modifiers = {"multiplier": "", "defense": "", "tempo": "", "bonus_event": ""}
 	modifier_levels.clear()
 	max_hearts = RUN_START_HEARTS
@@ -2248,11 +2270,19 @@ func _register_wave_completed() -> void:
 		_save_progress()
 		run_new_unlocks.append({"name": "5 Cash-Outs in a Run (Grand Finale)"})
 
-# See the MEMORY_SPAN_CEILING comment above for why this is linear-then-
-# quadratic instead of a pure s² curve.
+# See the CASHOUT_BASE comment above for why this compounds multiplicatively
+# at two different rates instead of being linear-then-quadratic.
 func _cash_out_base_bonus(s: int) -> float:
-	var beyond := maxf(0.0, float(s) - float(MEMORY_SPAN_CEILING))
-	return CASHOUT_LINEAR_K * float(s) + CASHOUT_QUADRATIC_K * beyond * beyond
+	var capped: int = mini(s, cash_out_ceiling)
+	var beyond: int = maxi(0, s - cash_out_ceiling)
+	return CASHOUT_BASE * pow(1.0 + GENTLE_RATE, float(capped)) * pow(1.0 + STEEP_RATE, float(beyond)) * permanent_mult
+
+# Grows the run-wide permanent multiplier from the portion of the
+# just-cashed-out streak that beat cash_out_ceiling - must be called before
+# _reset_streak() snapshots a fresh ceiling for the next streak.
+func _grow_permanent_mult(s: int) -> void:
+	var beyond: int = maxi(0, s - cash_out_ceiling)
+	permanent_mult += float(beyond) * PERMANENT_GROWTH_PER_BEYOND
 
 func _cash_out_streak_bonus() -> int:
 	var s := _current_wave_length() + double_down_boost_amount
@@ -2301,6 +2331,7 @@ func _on_cash_out_button_pressed() -> void:
 	score += total
 	unbanked_points = 0
 	waves_completed += 1
+	_grow_permanent_mult(_current_wave_length() + double_down_boost_amount)
 	_register_wave_completed()
 	_try_second_wind_refill()
 	_reset_streak()
@@ -3167,6 +3198,7 @@ func _reset_streak(clear_fully: bool = false) -> void:
 # Per-streak state: reset at run start and on every cash-out (a streak is
 # one growing sequence/phrase between resets).
 func _start_new_streak_modifier_state() -> void:
+	cash_out_ceiling = maxi(best_streak_this_run, BOOTSTRAP_FLOOR)
 	unbreakable_forgiven_this_streak = 0
 	current_streak_had_miss = false
 	double_down_index = -1
@@ -3611,13 +3643,13 @@ func _flash_forgiven() -> void:
 func _flash_miss_hint(pad_name: String) -> void:
 	_set_pads_disabled(true)
 	var extra := _hint_note_count() - 1
-	await pads_by_name[pad_name].flash(0.35)
+	await pads_by_name[pad_name].flash(0.35, 3.2, 0.5, false)
 	for i in extra:
 		var idx: int = player_index + 1 + i
 		if idx >= sequence.size():
 			break
 		await get_tree().create_timer(0.15).timeout
-		await pads_by_name[sequence[idx]].flash(0.3)
+		await pads_by_name[sequence[idx]].flash(0.3, 3.2, 0.5, false)
 	_set_pads_disabled(false)
 
 # Echo Chamber (Defense): a soft, quiet echo of the pad(s) you need next.

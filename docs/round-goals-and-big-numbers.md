@@ -1,155 +1,149 @@
-# Round Goals & Compounding Scoring — Proposal
+# Cash-out Economy v2 / Big Numbers — Design Doc
 
-**Status: proposal, not implemented.** Written for stakeholder review — every decision below needs
-a yes before any code changes. Supersedes nothing yet; `scoring-escalation.md` and
-`modifier-expansion.md` remain accurate for the shipped system until/unless this is approved.
+**Status: design approved, numbers unplaytested.** Supersedes this doc's own prior version entirely — see
+"What changed from the original proposal" below. `scoring-escalation.md` and
+`scoring-and-modifiers.md` remain accurate for the *shipped* system until this is approved and
+built.
 
 ## Why this doc exists
 
-Two problems surfaced in the same conversation, and they turned out to be more connected than they
-looked at first:
+Two problems, from the same conversation:
 
-1. **"There's no reason to press Cash Out."** Voluntary push-your-luck banking, even after the
-   hearts/formula/ramp passes, still leaves a real gap between "why stop right now" (rare, since
-   hearts absorb most failure) and "why stop eventually" (obviously true, but not felt moment to
-   moment).
-2. **"Scores never get big the way Balatro's do."** Balatro's numbers come from stacking multiple
-   *multiplicative* sources at once (two ×3 jokers make ×9, not ×6); this game's scoring is
-   deliberately additive/linear, and its one-modifier-per-category slot system structurally caps
-   how many multiplicative sources can ever be active together.
+1. **"There's no reason to press Cash Out."** Even after hearts and the piecewise cash-out formula,
+   there's a real gap between "why stop right now" (rare — hearts absorb most failure) and "why stop
+   eventually" (true, but not felt moment to moment).
+2. **"Scores never get big the way Balatro's do."** Balatro's numbers come from stacking
+   *multiplicative* sources (two ×3 jokers make ×9, not ×6); this game's scoring is deliberately
+   additive/linear (`combo_growth` is explicitly linear "so scores don't blow past the Best Score
+   unlock thresholds" — a real anti-Balatro design call already on record), and the one-modifier-
+   per-category slot system caps how many multiplicative sources can ever stack at once.
 
-The connecting insight: **if scoring compounds, the moment that compounding gets locked in becomes
-the natural "why bank" answer on its own** — you're not banking out of fear, you're banking because
-you just watched a number get big and you want to keep it. Fixing #2 well mostly fixes #1 for free.
+## What changed from the original proposal
 
-## Part 1: Round Goals (replacing voluntary Cash Out)
+The original version of this doc (Part 1) proposed replacing voluntary Cash Out with **auto-banking
+Round Goals** — a known target sequence length per round, banked automatically on clear, no button.
+A later design session explored this in real depth (independently, as the "fully-automatic
+bank-on-every-complete-sequence ante loop") and **rejected it**: it deletes the "continue or stop"
+decision entirely rather than answering it, which is the one thing Cash Out exists for. **Cash Out
+stays voluntary, with its own button, exactly as shipped.** Grand Finale therefore does *not* need
+the rescope the original doc proposed either — "wager the accumulated pool" still makes sense once
+there's still a pool.
 
-### The change
+What survives from the original doc: the core diagnosis (multiplicative stacking is why Balatro
+scores get big; additive/linear is why this game's don't) and the instinct that the "why bank"
+answer should come from *watching a number compound*, not from fear of loss. The mechanism below is
+different — compounding lives inside the existing voluntary cash-out formula instead of a new
+auto-bank system.
 
-Each round has a **known-in-advance target sequence length** (shown before the round starts, not
-discovered by hitting it). Clearing the target **auto-banks** — no button, no floor, no "did I wait
-too long" anxiety. A modifier draft (already happening every 3 rounds via
-`MODIFIER_ROUND_INTERVAL`) becomes the between-rounds breather, the same beat Balatro's shop
-occupies between blinds.
+## Resolved design
 
-### Why this is the right call
+- **Per-round payout compounds multiplicatively**, with two rates: gentle below the player's
+  personal ceiling, steep at/past it. Clearing "one more round" is meant to feel like a real
+  percentage jump each time, not a smooth curve.
+- **A permanent, run-wide multiplier grows on every cash-out — but only from the portion of a streak
+  past the ceiling.** Cashing out below the ceiling still always banks real points (no floor/gate on
+  banking itself), but contributes nothing to the permanent multiplier. This closes a real exploit:
+  without this restriction, a player could spam trivial 1-note cash-outs (risk-free) and compound a
+  tiny bump into something enormous for free.
+- **The ceiling is personal: `best_streak_this_run`**, not a fixed constant — the same "beat your own
+  record" condition Fortissimo and the redesigned Safety Net already use. Self-scales to the actual
+  player, and only ever rises, so it can't be kept artificially low to farm the permanent multiplier.
+  Must be read *before* the current round updates it (same ordering Fortissimo already relies on), or
+  `beyond` collapses to zero the instant a new record is set.
+- **Bootstrap ceiling:** a run's first streak has no recorded `best_streak_this_run` (starts at 0).
+  Resolved: use `max(best_streak_this_run, BOOTSTRAP_FLOOR)` with `BOOTSTRAP_FLOOR = 3`, so the first
+  streak gets a brief calm ramp instead of sitting entirely in the steep zone.
+- **Grand Finale keeps its current identity** (wager the accumulated pool) — unaffected, since Cash
+  Out staying voluntary means the pool it wagers still exists.
+- **Miss-recovery stays scoped as today** (single-note hint, no replay) — but the hint becomes
+  **visual-only**: the hinted pad(s) glow without playing their tone. Applies to both the base
+  single-note hint and Safety Net L5's extended further-ahead hint. This is a real behavior change:
+  `_flash_miss_hint()` currently calls `pads_by_name[pad_name].flash(...)`, and `flash()`
+  (`simon_button.gd`) plays `Sound.play_tone()` on every call — a silent variant (or a
+  volume/play-tone flag) is needed specifically for miss hints.
+- **Unlock ladder rebalance (500/1500/3000) stays explicitly deferred** until the new scoring shape
+  has real playtime behind it — those thresholds will need a full rebalance once compounding ships,
+  but not before.
 
-This game already ran this experiment once and it failed — a climbing wave cap that forced a reset,
-rejected specifically because it interrupted the player "at the exact moment they're most invested"
-(`scoring-escalation.md`'s own history). It would be reasonable to assume this is the same idea
-again. **It isn't, and the difference is the whole argument:** the old cap was an undiscovered
-number the player only learned about by hitting it, on a sequence that was otherwise growing
-forever with no destination. A round goal is a **visible finish line from the start** — the player
-is working *toward* it, not being cut off by it. Reaching it reads as "I did it," the same way
-clearing a Balatro blind does, not as being stopped. Same mechanical shape as the rejected design,
-opposite psychological framing, because the one variable that mattered (was the target known in
-advance) flipped.
+## Concrete formula (proposed — needs your sign-off on the constants)
 
-It also directly answers the "why cash out" gap from Part 1 of the earlier research pass: there's no
-gap to answer, because there's no moment where "should I stop" is even a question — the round has
-an end, you're always playing toward it, and banking happens because you won, not because you chose
-to.
+Reuses the existing `_cash_out_base_bonus(s)` function's signature and call sites
+(`scripts/Main.gd`) — only the body changes, and it's still multiplied by the existing combo
+multiplier and `score_bonus_percent` exactly as today.
 
-### What this breaks, honestly
+```gdscript
+const BOOTSTRAP_FLOOR := 3
+const CASHOUT_BASE := 70.0
+const GENTLE_RATE := 0.08   # +8% per round, below ceiling
+const STEEP_RATE := 0.35    # +35% per round, past ceiling
+const PERMANENT_GROWTH_PER_BEYOND := 0.05
 
-- **Cash Out button, `cash_out_floor`** — gone. There's no "whenever you feel like it" banking
-  moment to gate.
-- **Grand Finale** — its whole premise (wager a big accumulated pool) stops making sense once there
-  is no big idle pool sitting around. Proposed replacement: wager *this round's* bank on clearing
-  one extra note beyond the target, for a multiplier — same "double or nothing" identity, rescoped
-  to a bounded stake instead of an open-ended one.
-- **Second Wind's heart refill** — trigger moves from "on voluntary cash-out" to "on round-goal
-  clear." Nearly a no-op change; the hook already lives right where the bank happens.
-- **Milestone flags** (`five_cashouts`, `zero_miss_wave`) — `five_cashouts` becomes `five_round_
-  clears`; `zero_miss_wave` is unaffected (already round-scoped).
-- **Hearts** — unaffected, and still doing real work: a miss inside a round still costs a heart,
-  still bounded per-run. Round goals bound the *upside* (how much you can lose in one failure);
-  hearts bound the *downside* (how many failures the whole run survives). They're solving different
-  problems and both stay.
+func _cash_out_ceiling() -> int:
+    return max(best_streak_this_run, BOOTSTRAP_FLOOR)
 
-### Concrete mechanics
+func _cash_out_base_bonus(s: int) -> float:
+    var ceiling := _cash_out_ceiling()
+    var capped := min(s, ceiling)
+    var beyond := max(0, s - ceiling)
+    return CASHOUT_BASE * pow(1.0 + GENTLE_RATE, capped) * pow(1.0 + STEEP_RATE, beyond) * permanent_mult
 
-- **Target length curve**, anchored to `MEMORY_SPAN_CEILING = 8` the same way the retired cash-out
-  formula was: early rounds short and forgiving (target 3, 4, 5 — round 3 already lines up with the
-  first modifier draft), climbing toward the real ceiling by round 6-8, and continuing to climb
-  after it for players with a build that can handle it. Exact curve is a tuning pass, not a design
-  decision — flagging the shape (gentle-then-real), not the constants.
-- **Duet Mode** already has an analogous per-round-scoped quantity (`duet_wave_round` driving
-  phrase length/tempo, reset on what's currently a cash-out) — round goals map onto it almost
-  directly, less new work than it might look like.
-- **Chaos Mode's reshuffle** and the **inflected speed ramp** (already keyed to
-  `MEMORY_SPAN_CEILING`) are untouched — they still apply within a round exactly as now.
+# On cash-out, before best_streak_this_run updates for this streak:
+func _grow_permanent_mult(s: int) -> void:
+    var beyond := max(0, s - _cash_out_ceiling())
+    permanent_mult += float(beyond) * PERMANENT_GROWTH_PER_BEYOND
+```
 
-## Part 2: Compounding Scoring (the "big numbers" fix)
+`permanent_mult` starts at `1.0` per run, persists across cash-outs (like combo/modifiers), and
+applies multiplicatively to every future payout — including ones below the ceiling, since it
+represents banked *past* risk, not a bonus tied to the current streak.
 
-### The change
+**Why these numbers, and how they compare to the shipped formula** (`CASHOUT_LINEAR_K = 16`,
+`CASHOUT_QUADRATIC_K = 10`, ceiling anchored at `MEMORY_SPAN_CEILING = 8`):
 
-Stop treating every modifier's contribution as an independent addition to a shared pool. Introduce
-**deliberate multiplicative compounding** in specific, chosen places, and make the round-goal clear
-(Part 1) the moment that compounding pays off in one dramatic number — the equivalent of a Balatro
-hand's score cascade, not spread thin across many small hits.
+| streak `s` | beyond ceiling(8) | shipped formula | proposed formula (permanent_mult=1) |
+|---|---|---|---|
+| 8 (at ceiling) | 0 | 128 | 130 |
+| 12 | 4 | 352 | 430 |
+| 16 | 8 | 896 | 1,148 |
+| 20 | 12 | 1,760 | 4,277 |
 
-### Why this is the right call
+`CASHOUT_BASE = 70` was picked so the two formulas roughly agree *at* the ceiling — parity there
+means early/typical runs won't feel like they suddenly got a stealth buff — and diverge increasingly
+past it, which is the whole point: pushing past your personal record should compound harder than the
+old quadratic tail did. Past `s=20`, growth is intentionally steep (a 12-round push past ceiling is
+already a ~33x multiplier from `STEEP_RATE` alone) — this is the "Balatro-big" territory the doc set
+out to reach, but it's the part most likely to need retuning once it's actually played.
 
-The mechanism is well-documented and not a matter of taste: Balatro's score formula is `Chips ×
-Mult`, and two ×3 Mult sources produce ×9 together, not ×6 — multiplicative stacking is
-*combinatorially* bigger than additive stacking, and that gap is *why* Balatro run scores reach
-into the billions while this game's scores sit in the low thousands by design. That's not an
-accident either — `combo_growth` is explicitly linear "so scores don't blow past the Best Score
-unlock thresholds," a deliberate anti-Balatro choice already on record. Wanting Balatro-scale
-numbers means consciously reversing that specific call, not tuning a constant, and it's worth being
-honest that this is a real design reversal before it's approved, not just a numbers buff.
+**Resolved on the numbers themselves** (2026-08-16 follow-up):
 
-What doesn't need to change: `_register_hit()`'s cascade of per-modifier "+N" popups already *is*
-Balatro's per-joker reveal mechanism (the code comment says so directly) — the visual/psychological
-device for "watch a number climb step by step" is already built. Only the math underneath it is too
-small to be dramatic.
+1. `GENTLE_RATE = 0.08` / `STEEP_RATE = 0.35` confirmed as proposed — the table above stands as the
+   real target curve, not just an illustrative first pass.
+2. `PERMANENT_GROWTH_PER_BEYOND = 0.05` grows `permanent_mult` **additively**
+   (`permanent_mult += beyond * 0.05`), not multiplicatively — deliberately avoids a second layer of
+   runaway exponential growth stacked on top of the already-exponential per-round formula.
+3. **Crescendo stacking is intended, not an oversight.** `permanent_mult` (unconditional baseline,
+   keyed off beating your own record) and Crescendo L5 (opt-in modifier, keyed off cash-out count)
+   are different signals and are meant to compound together — a build that lands both is meant to
+   feel like a jackpot combo.
+4. `permanent_mult` grows **unbounded** for the life of a run, matching Balatro's own unbounded
+   joker scaling — hearts and miss-risk already bound how long a run can realistically run, so no
+   separate soft ceiling/decay is needed on the multiplier itself.
 
-### Concrete mechanics
+## What this doesn't touch
 
-- **Extend the one compounding example that already exists.** Crescendo's L5 is already
-  `pow(1 + per_wave, waves_completed)` — genuinely exponential, not a bigger flat number. Proposal:
-  more of the Multiplier category's top levels adopt this shape instead of a flat percentage bump,
-  so reaching a modifier's max level is a qualitative change in scoring shape, not just a bigger
-  additive bonus.
-- **Cross-category synergy** — a modifier that scales its own strength off *which other categories
-  are equipped*, not just off game state. This is the actual Balatro-joker-synergy move, scoped to
-  what a 4-slot system can realistically do: not "stack 5 xMult jokers" (there's no slot budget for
-  that here), but "did you build a combination that compounds," which is a real deckbuilding
-  decision distinct from "which single pick is individually strongest."
-- **Concentrate the reveal at round-goal clear**, not every hit. A Balatro hand's score is the big
-  number, not any single played card — round-goal clear is this game's equivalent unit, and Part 1
-  already gives it a clean, guaranteed moment to happen in.
+- Cash Out button, `unbanked_points`/`score` two-pool split, hearts, the modifier slot system, Duet's
+  `duet_wave_round` — all unaffected, exactly as `scoring-and-modifiers.md` and
+  `scoring-escalation.md` already describe them.
+- Musical chunking (motif generation, the subtle repeat-cue, Harmonic Chain/Breath Mark/Motif Bonus)
+  — independent work, not part of this pass. If it ships, the doc's original notes on it (subtlety
+  bar, Chaos Mode's pad-identity gotcha) still apply unchanged; not repeated here since nothing about
+  them changed.
 
-### What this breaks, honestly
+## Open items for implementation
 
-- **The Best Score unlock ladder (500 / 1500 / 3000)** needs a full rebalance, not a tweak — those
-  thresholds were sized for the current ceiling and would become trivial almost immediately once
-  compounding is real, the same way Balatro's early antes are trivial once a run is geared up.
-  This needs its own numbers pass once the scoring shape is settled, not before.
-- **Any remaining "keep scores sane" assumptions** elsewhere in the codebase (worth an explicit
-  audit once this is approved, not assumed clean) — the linear-combo-growth comment is the one
-  that's already flagged; there may be others written against the same assumption.
-
-## How the two parts fit together
-
-Part 2 needs Part 1 more than the reverse: compounding scoring wants a clean, guaranteed "big
-reveal" moment to pay off in, and round-goal clears are exactly that moment. Compounding could
-technically be added on top of the current voluntary Cash Out instead, but it would inherit the same
-felt-urgency gap Part 1 exists to fix — the payoff would still only land when the player *chose* to
-claim it, which is the thing already established as the weak point. Recommended order: **Part 1
-first**, Part 2 built to land inside the structure Part 1 creates.
-
-## Open questions for the stakeholder
-
-Each of these is a real fork, not a detail — flagging them explicitly rather than picking silently:
-
-1. Does the round-goal shape (Part 1) match what you pictured, or is there a different structure in
-   mind?
-2. Grand Finale's rescoped "wager this round's bank for one extra note" replacement — right
-   direction, or does that modifier need a completely different identity once there's no big idle
-   pool to gamble?
-3. How aggressive should compounding get — extend the Crescendo-style shape to a few more top
-   levels, or go further (cross-category synergy) in the same pass?
-4. Is a full unlock-ladder rebalance in scope now, or is it explicitly deferred to "once the new
-   scoring shape has real playtime behind it"?
+- All design questions are resolved; remaining work is implementation and playtesting the constants
+  above (`CASHOUT_BASE`, `GENTLE_RATE`, `STEEP_RATE`, `PERMANENT_GROWTH_PER_BEYOND`,
+  `BOOTSTRAP_FLOOR`) at real long-run lengths — expect these to move after real play.
+- Unlock ladder rebalance (500/1500/3000) — deferred, own pass, after this ships and has playtime.
+- Miss-hint silence needs a `flash()` variant/param that skips `Sound.play_tone()` — small, isolated
+  change, not blocked on anything else here.
